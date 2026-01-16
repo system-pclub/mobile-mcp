@@ -19,5 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "mobile-mcp"
-include(":llm-app")
+rootProject.name = "llm-app"
+include(":app")
+ 
