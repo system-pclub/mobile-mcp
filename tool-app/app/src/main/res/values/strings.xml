@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">MCP Demo</string>
+    <string name="waiting">waiting...</string>
+    <string name="click_me">click me</string>
+</resources>

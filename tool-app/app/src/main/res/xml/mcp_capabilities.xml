@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mcp>
+    <capability
+        id="click_main_button"
+        description="Click the action button on the main screen, and then the text will display on the bottom of the screen."
+        version="1" />
+</mcp>
