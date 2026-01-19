@@ -30,7 +30,7 @@
             <!-- 告诉大模型该应用可以被ai调用 -->
             <meta-data
                 android:name="mcp.capabilities"
-                android:resource="@raw/mcp_capabilities" />
+                android:resource="@xml/mcp_capabilities" />
 
             <intent-filter>
                 <action android:name="com.example.mcpdemo.COMMAND_GATEWAY" />

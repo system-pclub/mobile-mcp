@@ -2,11 +2,13 @@ package com.example.llm_app
 
 import android.content.*
 import android.content.pm.PackageManager
+import android.content.res.Resources
 import android.os.Bundle
 import android.os.IBinder
 import android.os.Handler
 
 import android.speech.RecognizerIntent
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -24,12 +26,18 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.*
 
-import com.example.commandgateway.ICommandGateway
+import com.example.mcpdemo.ICommandGateway
+import org.xmlpull.v1.XmlPullParser
 
 class MainActivity : ComponentActivity() {
 
-    // MCP Capabilities cache: packageName -> XML string
-    private val mcpCapabilities = mutableMapOf<String, String>()
+    // MCP Capabilities cache: packageName, service, XML string
+    data class McpServiceInfo(
+        val packageName: String,
+        val serviceName: String,
+        val capabilitiesXml: String
+    )
+    private val mcpServices = mutableListOf<McpServiceInfo>()
 
     // Service binding
     private var commandGateway: ICommandGateway? = null
@@ -57,25 +65,103 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun retrieveMcpCapabilities() {
+//        Log.d(
+//            "mcpSearcher",
+//            "enter retrieveMcpCapabilities"
+//        )
         val pm = packageManager
-        val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+//        val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+//        Log.d("mcpSearcher", "Found ${packages.size} MCP packages")
+//
+//        for (app in packages) {
+//            val meta = app.metaData ?: continue
+//            if (meta.containsKey("mcp.capabilities")) {
+//                try {
+//                    val resId = meta.getInt("mcp.capabilities")
+//                    val xml = xmlToString(resId)
+//                    mcpCapabilities[app.packageName] = xml
+//                    Log.d(
+//                        "mcpSearcher",
+//                        "Package: ${app.packageName}\nMCP XML:\n$xml"
+//                    )
+//                } catch (e: Exception) {
+//                    e.printStackTrace()
+//                }
+//            }
+//        }
 
-        for (app in packages) {
-            val meta = app.metaData ?: continue
+        val intent = Intent("com.example.mcpdemo.COMMAND_GATEWAY")
+        val services = pm.queryIntentServices(
+            intent,
+            PackageManager.GET_META_DATA
+        )
+        Log.d("mcpSearcher", "Found ${services.size} MCP services")
+
+        for (resolveInfo in services) {
+            val serviceInfo = resolveInfo.serviceInfo
+            val meta = serviceInfo.metaData ?: continue
+
             if (meta.containsKey("mcp.capabilities")) {
                 try {
                     val resId = meta.getInt("mcp.capabilities")
-                    val xml = xmlToString(resId)
-                    mcpCapabilities[app.packageName] = xml
+                    // Get resources for the remote app
+                    val remoteRes = pm.getResourcesForApplication(serviceInfo.applicationInfo)
+                    val xml = xmlToString(remoteRes, resId)
+
+                    val pkg = serviceInfo.packageName
+                    val serviceName = serviceInfo.name   // fully qualified class name
+                    val mcpService = McpServiceInfo(
+                        packageName = pkg,
+                        serviceName = serviceName,
+                        capabilitiesXml = xml
+                    )
+
+                    mcpServices.add(mcpService)
+                    Log.d(
+                        "mcpSearcher",
+                        """
+                        MCP Service Found:
+                        Package : $pkg
+                        Service : $serviceName
+                        Capabilities:
+                        $xml
+                        """.trimIndent()
+                            )
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    Log.e("mcpSearcher", "Failed loading MCP for ${serviceInfo.packageName}", e)
                 }
             }
         }
     }
 
-    private fun xmlToString(resId: Int): String {
-        return resources.openRawResource(resId).bufferedReader().use { it.readText() }
+    fun xmlToString(res: Resources, resId: Int): String {
+        val parser = res.getXml(resId)
+        val sb = StringBuilder()
+        var eventType = parser.eventType
+
+        while (eventType != XmlPullParser.END_DOCUMENT) {
+            when (eventType) {
+                XmlPullParser.START_TAG -> {
+                    sb.append("<${parser.name}")
+
+                    // Read attributes
+                    for (i in 0 until parser.attributeCount) {
+                        sb.append(" ${parser.getAttributeName(i)}=\"${parser.getAttributeValue(i)}\"")
+                    }
+
+                    sb.append(">")
+                }
+                XmlPullParser.TEXT -> {
+                    sb.append(parser.text)
+                }
+                XmlPullParser.END_TAG -> {
+                    sb.append("</${parser.name}>")
+                }
+            }
+            eventType = parser.next()
+        }
+
+        return sb.toString()
     }
 
     private fun callOpenAIAndExecute(recognizedText: String, onStatusUpdate: (String) -> Unit) {
@@ -83,13 +169,14 @@ class MainActivity : ComponentActivity() {
             try {
                 onStatusUpdate("Calling OpenAI...")
 
-                val apiKey = "YOUR_OPENAI_API_KEY"
+                val apiKey = "API_KEY"
 
                 val mcpArray = JSONArray()
-                for ((pkg, xml) in mcpCapabilities) {
+                for (svc in mcpServices) {
                     val obj = JSONObject()
-                    obj.put("package", pkg)
-                    obj.put("capabilities", xml)
+                    obj.put("package", svc.packageName)
+                    obj.put("service", svc.serviceName)
+                    obj.put("capabilities", svc.capabilitiesXml)
                     mcpArray.put(obj)
                 }
 
@@ -100,7 +187,7 @@ class MainActivity : ComponentActivity() {
                                 put("role", "system")
                                 put(
                                     "content",
-                                    "You are an MCP command planner. Given user intent and MCP capabilities, output a JSON command {package, service, commandJson}."
+                                    "You are an MCP command planner. Given user intent and MCP capabilities, output a JSON command {package:XXX, service:XXX, commandJson:{capability:XXX, args:{}}}."
                                 )
                             })
                             put(JSONObject().apply {
@@ -135,8 +222,18 @@ class MainActivity : ComponentActivity() {
 
                 val response = conn.inputStream.bufferedReader().readText()
 
+                Log.d(
+                    "openAI",
+                    "response: $response"
+                )
+
                 // Parse JSON command from OpenAI
                 val command = parseCommandFromResponse(response)
+
+                Log.d(
+                    "openAI",
+                    "prase command: $command"
+                )
 
                 onStatusUpdate("Executing command...")
 
@@ -177,6 +274,10 @@ class MainActivity : ComponentActivity() {
 
         // Optional: check service exists
         val resolved = packageManager.resolveService(intent, 0) ?: return
+        Log.d(
+            "executeCommand",
+            "check service exists: $resolved"
+        )
 
         bindService(intent, serviceConnection, BIND_AUTO_CREATE)
 
@@ -184,7 +285,8 @@ class MainActivity : ComponentActivity() {
         Handler(mainLooper).postDelayed({
             try {
                 commandGateway?.invoke(commandJson)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }, 500)
     }
