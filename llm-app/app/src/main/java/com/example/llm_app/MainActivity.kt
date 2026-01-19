@@ -14,6 +14,20 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +44,11 @@ import com.example.mcpdemo.ICommandGateway
 import org.xmlpull.v1.XmlPullParser
 
 class MainActivity : ComponentActivity() {
+
+    data class ChatMessage(
+        val text: String,
+        val isUser: Boolean
+    )
 
     // MCP Capabilities cache: packageName, service, XML string
     data class McpServiceInfo(
@@ -169,7 +188,9 @@ class MainActivity : ComponentActivity() {
             try {
                 onStatusUpdate("Calling OpenAI...")
 
-                val apiKey = "API_KEY"
+                val apiKey = assets.open("openai_key.txt")
+                    .bufferedReader()
+                    .use { it.readText().trim() }
 
                 val mcpArray = JSONArray()
                 for (svc in mcpServices) {
@@ -294,8 +315,9 @@ class MainActivity : ComponentActivity() {
     /* ===================== Compose UI ===================== */
     @Composable
     fun VoiceToCommandScreen() {
-        var recognizedText by remember { mutableStateOf("") }
+        var inputText by remember { mutableStateOf("") }
         var status by remember { mutableStateOf("Idle") }
+        val messages = remember { mutableStateListOf<ChatMessage>() }
         val scope = rememberCoroutineScope()
 
         val speechLauncher = rememberLauncherForActivityResult(
@@ -304,44 +326,127 @@ class MainActivity : ComponentActivity() {
             if (result.resultCode == RESULT_OK) {
                 val results =
                     result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                recognizedText = results?.firstOrNull() ?: ""
-                // Call OpenAI when speech is recognized
-                scope.launch {
-                    callOpenAIAndExecute(recognizedText) { s ->
-                        status = s
-                    }
-                }
+                val text = results?.firstOrNull() ?: return@rememberLauncherForActivityResult
+                sendMessage(text, messages, scope) { status = it }
             }
         }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(12.dp)
         ) {
 
-            Button(onClick = {
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(
-                        RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                    )
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+            // Chat history
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                reverseLayout = false
+            ) {
+                items(messages) { msg ->
+                    ChatBubble(msg)
                 }
-                speechLauncher.launch(intent)
-            }) {
-                Text("Speak")
             }
 
-            Spacer(Modifier.height(16.dp))
+            // Status
+//            Text(
+//                text = status,
+//                style = MaterialTheme.typography.bodySmall,
+//                color = Color.Gray
+//            )
 
-//            Text("Recognized text:")
-            Text(recognizedText, style = MaterialTheme.typography.bodyLarge)
+            // Input row (like ChatGPT)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
 
-            Spacer(Modifier.height(16.dp))
-//            Text("Status: $status", style = MaterialTheme.typography.bodyMedium)
+                TextField(
+                    value = inputText,
+                    onValueChange = { inputText = it },
+                    modifier = Modifier
+                        .weight(1f),
+                    placeholder = { Text("Type a message…") },
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        imeAction = ImeAction.Send
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSend = {
+                            if (inputText.isNotBlank()) {
+                                sendMessage(inputText, messages, scope) { status = it }
+                                inputText = ""
+                            }
+                        }
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(Modifier.width(8.dp))
+
+                // Voice button
+                IconButton(onClick = {
+                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(
+                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                        )
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                    }
+                    speechLauncher.launch(intent)
+                }) {
+                    Icon(Icons.Default.Mic, contentDescription = "Speak")
+                }
+
+                // Send button
+                IconButton(onClick = {
+                    if (inputText.isNotBlank()) {
+                        sendMessage(inputText, messages, scope) { status = it }
+                        inputText = ""
+                    }
+                }) {
+                    Icon(Icons.Default.Send, contentDescription = "Send")
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun ChatBubble(msg: ChatMessage) {
+        val bgColor = if (msg.isUser) Color(0xFFDCF8C6) else Color(0xFFEDEDED)
+        val alignment = if (msg.isUser) Alignment.CenterEnd else Alignment.CenterStart
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(),
+            contentAlignment = alignment
+        ) {
+            Text(
+                text = msg.text,
+                modifier = Modifier
+                    .padding(6.dp)
+                    .background(bgColor, RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+
+    private fun sendMessage(
+        text: String,
+        messages: MutableList<ChatMessage>,
+        scope: CoroutineScope,
+        onStatusUpdate: (String) -> Unit
+    ) {
+        messages.add(ChatMessage(text, isUser = true))
+
+        scope.launch {
+            callOpenAIAndExecute(text) { status ->
+                onStatusUpdate(status)
+                messages.add(ChatMessage(status, isUser = false))
+            }
         }
     }
 }
