@@ -24,9 +24,12 @@ public class CommandGatewayService extends Service {
                 String capabilityId = json.optString("capabilityId");
 
                 if ("check_in".equals(capabilityId)) {
-                    // If the capability is 'check_in', send a broadcast to the activity.
+                    // Improvement: Use an explicit broadcast for security.
                     Intent intent = new Intent(ACTION_PERFORM_CHECK_IN);
+                    intent.setPackage(getPackageName());
                     sendBroadcast(intent);
+                } else {
+                    Log.w(TAG, "Unknown capability: " + capabilityId);
                 }
             } catch (JSONException e) {
                 Log.e(TAG, "Failed to parse command JSON", e);
@@ -35,8 +38,20 @@ public class CommandGatewayService extends Service {
     };
 
     @Override
+    public void onCreate() {
+        super.onCreate();
+        Log.d(TAG, "CommandGatewayService created");
+    }
+
+    @Override
     public IBinder onBind(Intent intent) {
         // Return the binder interface for clients to connect.
         return binder;
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        Log.d(TAG, "CommandGatewayService destroyed");
     }
 }
