@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">MCP Demo</string>
-    <string name="waiting">waiting...</string>
-    <string name="click_me">click me</string>
+    <string name="check_in_log">打卡日志</string>
+    <string name="check_in">打卡</string>
+    <string name="check_in_success">打卡成功</string>
+    <string name="greeting">今天也要元气满满！</string>
 </resources>

@@ -21,20 +21,21 @@
             </intent-filter>
         </activity>
 
+
         <!-- 注册对外服务的 Service -->
         <service
             android:name=".CommandGatewayService"
             android:enabled="true"
             android:exported="true"
             tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="com.example.mcpdemo.COMMAND_GATEWAY" />
+            </intent-filter>
+
             <!-- 告诉大模型该应用可以被ai调用 -->
             <meta-data
                 android:name="mcp.capabilities"
                 android:resource="@xml/mcp_capabilities" />
-
-            <intent-filter>
-                <action android:name="com.example.mcpdemo.COMMAND_GATEWAY" />
-            </intent-filter>
         </service>
 
     </application>
