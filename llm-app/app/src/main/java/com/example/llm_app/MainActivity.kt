@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +43,7 @@ import java.util.*
 
 import com.example.mcpdemo.ICommandGateway
 import org.xmlpull.v1.XmlPullParser
+import java.text.SimpleDateFormat
 
 class MainActivity : ComponentActivity() {
 
@@ -50,20 +52,32 @@ class MainActivity : ComponentActivity() {
         val isUser: Boolean
     )
 
-    // MCP Capabilities cache: packageName, service, XML string
-    data class McpServiceInfo(
-        val packageName: String,
+    data class McpCapability(
         val serviceName: String,
         val capabilitiesXml: String
     )
-    private val mcpServices = mutableListOf<McpServiceInfo>()
+
+    data class McpAppInfo(
+        val packageName: String,
+        val appName: String,
+        val appDescription: String,
+        val capabilities: MutableList<McpCapability> = mutableListOf()
+    )
+
+    val mcpAppMap: MutableMap<String, McpAppInfo> = mutableMapOf()
 
     // Service binding
     private var commandGateway: ICommandGateway? = null
     private var boundPackage: String? = null
+
+    private var pendingCommandJson: String? = null
+    private var pendingResultCallback: ((String) -> Unit)? = null
+
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             commandGateway = ICommandGateway.Stub.asInterface(service)
+            isBound = true
+            Log.d("executeCommand", "Service connected")
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -71,8 +85,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    lateinit var gatewayIntent: Intent
+    var isBound = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        gatewayIntent = Intent().apply {
+            component = ComponentName(
+                "com.example.mcpdemo",
+                "com.example.mcpdemo.CommandGatewayService"
+            )
+        }
+
+        bindService(gatewayIntent, serviceConnection, BIND_AUTO_CREATE)
 
         // 1️⃣ Load MCP capabilities at startup
         retrieveMcpCapabilities()
@@ -84,73 +110,83 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun retrieveMcpCapabilities() {
-//        Log.d(
-//            "mcpSearcher",
-//            "enter retrieveMcpCapabilities"
-//        )
         val pm = packageManager
-//        val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-//        Log.d("mcpSearcher", "Found ${packages.size} MCP packages")
-//
-//        for (app in packages) {
-//            val meta = app.metaData ?: continue
-//            if (meta.containsKey("mcp.capabilities")) {
-//                try {
-//                    val resId = meta.getInt("mcp.capabilities")
-//                    val xml = xmlToString(resId)
-//                    mcpCapabilities[app.packageName] = xml
-//                    Log.d(
-//                        "mcpSearcher",
-//                        "Package: ${app.packageName}\nMCP XML:\n$xml"
-//                    )
-//                } catch (e: Exception) {
-//                    e.printStackTrace()
-//                }
-//            }
-//        }
-
         val intent = Intent("com.example.mcpdemo.COMMAND_GATEWAY")
+
         val services = pm.queryIntentServices(
             intent,
             PackageManager.GET_META_DATA
         )
+
         Log.d("mcpSearcher", "Found ${services.size} MCP services")
 
         for (resolveInfo in services) {
             val serviceInfo = resolveInfo.serviceInfo
+            val appInfo = serviceInfo.applicationInfo
+
             val meta = serviceInfo.metaData ?: continue
+            if (!meta.containsKey("mcp.capabilities")) continue
 
-            if (meta.containsKey("mcp.capabilities")) {
-                try {
-                    val resId = meta.getInt("mcp.capabilities")
-                    // Get resources for the remote app
-                    val remoteRes = pm.getResourcesForApplication(serviceInfo.applicationInfo)
-                    val xml = xmlToString(remoteRes, resId)
+            try {
+                val resId = meta.getInt("mcp.capabilities")
 
-                    val pkg = serviceInfo.packageName
-                    val serviceName = serviceInfo.name   // fully qualified class name
-                    val mcpService = McpServiceInfo(
-                        packageName = pkg,
-                        serviceName = serviceName,
-                        capabilitiesXml = xml
-                    )
+                // Remote resources
+                val remoteRes = pm.getResourcesForApplication(appInfo)
+                val xml = xmlToString(remoteRes, resId)
 
-                    mcpServices.add(mcpService)
-                    Log.d(
-                        "mcpSearcher",
-                        """
-                        MCP Service Found:
-                        Package : $pkg
-                        Service : $serviceName
-                        Capabilities:
-                        $xml
-                        """.trimIndent()
-                            )
+                val pkg = appInfo.packageName
+                val serviceName = serviceInfo.name   // fully-qualified service class
+
+                // App display name
+                val appName = pm.getApplicationLabel(appInfo).toString()
+
+                // App description (optional, from manifest or fallback)
+                val appDescription = try {
+                    if (appInfo.descriptionRes != 0)
+                        remoteRes.getString(appInfo.descriptionRes)
+                    else
+                        "No description"
                 } catch (e: Exception) {
-                    Log.e("mcpSearcher", "Failed loading MCP for ${serviceInfo.packageName}", e)
+                    "No description"
                 }
+
+                val capability = McpCapability(
+                    serviceName = serviceName,
+                    capabilitiesXml = xml
+                )
+
+                val appEntry = mcpAppMap.getOrPut(pkg) {
+                    McpAppInfo(
+                        packageName = pkg,
+                        appName = appName,
+                        appDescription = appDescription
+                    )
+                }
+
+                appEntry.capabilities.add(capability)
+
+                Log.d(
+                    "mcpSearcher",
+                    """
+                MCP App:
+                Package : ${appEntry.packageName}
+                Name    : ${appEntry.appName}
+                Desc    : ${appEntry.appDescription}
+
+                Added Capability:
+                Service : $serviceName
+                XML:
+                $xml
+                """.trimIndent()
+                )
+
+            } catch (e: Exception) {
+                Log.e("mcpSearcher", "Failed loading MCP for ${serviceInfo.packageName}", e)
             }
         }
+
+        // Final summary
+        Log.d("mcpSearcher", "Total MCP apps found: ${mcpAppMap.size}")
     }
 
     fun xmlToString(res: Resources, resId: Int): String {
@@ -183,32 +219,42 @@ class MainActivity : ComponentActivity() {
         return sb.toString()
     }
 
-    private fun callOpenAIAndExecute(recognizedText: String, onStatusUpdate: (String) -> Unit) {
+    private fun callOpenAIAndExecute(
+        recognizedText: String,
+        onStatusUpdate: (String) -> Unit
+    ) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                onStatusUpdate("Calling OpenAI...")
-
                 val apiKey = assets.open("openai_key.txt")
                     .bufferedReader()
                     .use { it.readText().trim() }
 
-                val mcpArray = JSONArray()
-                for (svc in mcpServices) {
+                /* ================= 1️⃣ APP SELECTION ================= */
+//                onStatusUpdate("Selecting target app...")
+
+                val appList = JSONArray()
+                for ((_, app) in mcpAppMap) {
                     val obj = JSONObject()
-                    obj.put("package", svc.packageName)
-                    obj.put("service", svc.serviceName)
-                    obj.put("capabilities", svc.capabilitiesXml)
-                    mcpArray.put(obj)
+                    obj.put("package", app.packageName)
+                    obj.put("name", app.appName)
+                    obj.put("description", app.appDescription)
+                    appList.put(obj)
                 }
 
-                val prompt = JSONObject().apply {
+                val appSelectPrompt = JSONObject().apply {
+                    put("model", "gpt-4o-mini")
                     put(
                         "messages", JSONArray().apply {
                             put(JSONObject().apply {
                                 put("role", "system")
                                 put(
                                     "content",
-                                    "You are an MCP command planner. Given user intent and MCP capabilities, output a JSON command {package:XXX, service:XXX, commandJson:{capability:XXX, args:{}}}."
+                                    """
+                                You are an MCP app selector.
+                                Given user intent and a list of apps,
+                                return only JSON:
+                                { "package": "xxx" }
+                                """.trimIndent()
                                 )
                             })
                             put(JSONObject().apply {
@@ -216,51 +262,122 @@ class MainActivity : ComponentActivity() {
                                 put(
                                     "content",
                                     """
-                                    User says: "$recognizedText"
-                                    MCP capabilities: $mcpArray
-                                    """.trimIndent()
+                                User intent: "$recognizedText"
+                                Available apps:
+                                $appList
+                                """.trimIndent()
                                 )
                             })
                         }
                     )
                 }
 
-                val url = URL("https://api.openai.com/v1/chat/completions")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.setRequestProperty("Authorization", "Bearer $apiKey")
-                conn.doOutput = true
+                val selectedPackage = callOpenAI(apiKey, appSelectPrompt)
+                    .let { JSONObject(it).getString("package") }
 
-                val body = JSONObject().apply {
+                val selectedApp = mcpAppMap[selectedPackage]
+                    ?: throw IllegalStateException("Package not found: $selectedPackage")
+
+                Log.d("openAI", "Selected package: $selectedPackage, app name: ${selectedApp.appName}")
+                onStatusUpdate("Select target app: ${selectedApp.appName} (${selectedApp.appDescription})")
+
+                /* ================= 2️⃣ SERVICE + CAPABILITY ================= */
+
+//                onStatusUpdate("Selecting service and capability...")
+
+                val serviceList = JSONArray()
+                for (cap in selectedApp.capabilities) {
+                    val obj = JSONObject()
+                    obj.put("service", cap.serviceName)
+                    obj.put("capabilitiesXml", cap.capabilitiesXml)
+                    serviceList.put(obj)
+                }
+
+                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                    .format(Date())
+
+                val capabilityPrompt = JSONObject().apply {
                     put("model", "gpt-4o-mini")
-                    put("messages", prompt.getJSONArray("messages"))
+                    put(
+                        "messages", JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("role", "system")
+                                put(
+                                    "content",
+                                    """
+                                You are an MCP command planner.
+                                Given user intent and service capabilities,
+                                output only JSON:
+                                {
+                                  "service": "xxx",
+                                  "capability": "xxx",
+                                  "args": { }
+                                }
+                                When the user refers to "today", use the provided current date.
+                                """.trimIndent()
+                                )
+                            })
+                            put(JSONObject().apply {
+                                put("role", "user")
+                                put(
+                                    "content",
+                                    """
+                                Today is: $today
+                                User intent: "$recognizedText"
+                                Services:
+                                $serviceList
+                                """.trimIndent()
+                                )
+                            })
+                        }
+                    )
                 }
 
-                conn.outputStream.use {
-                    it.write(body.toString().toByteArray())
+                val commandJsonStr = callOpenAI(apiKey, capabilityPrompt)
+                val commandObj = JSONObject(commandJsonStr)
+
+                /* ================= 3️⃣ FINAL COMMAND ================= */
+
+//                val finalCommand = JSONObject().apply {
+//                    put("package", selectedPackage)
+//                    put("service", commandObj.getString("service"))
+//                    put(
+//                        "commandJson", JSONObject().apply {
+//                            put("capability", commandObj.getString("capability"))
+//                            put("args", commandObj.getJSONObject("args"))
+//                        }
+//                    )
+//                }
+
+                val argsObj = commandObj.getJSONObject("args")
+
+                val commandJson = JSONObject().apply {
+                    // still keep capability at top level
+                    put("capability", commandObj.getString("capability"))
+
+                    // copy all fields from args directly into commandJson
+                    val keys = argsObj.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        put(key, argsObj.get(key))
+                    }
                 }
 
-                val response = conn.inputStream.bufferedReader().readText()
+                val finalCommand = JSONObject().apply {
+                    put("package", selectedPackage)
+                    put("service", commandObj.getString("service"))
+                    put("commandJson", commandJson)
+                }
 
-                Log.d(
-                    "openAI",
-                    "response: $response"
-                )
+                Log.d("openAI", "Final command: $finalCommand")
 
-                // Parse JSON command from OpenAI
-                val command = parseCommandFromResponse(response)
-
-                Log.d(
-                    "openAI",
-                    "prase command: $command"
-                )
-
-                onStatusUpdate("Executing command...")
-
-                executeCommand(command)
-
-                onStatusUpdate("Command executed!")
+                onStatusUpdate("Executing command: ${commandObj.getString("capability")}")
+                executeCommand(finalCommand) { result ->
+                    runOnUiThread {
+                        Log.d("openAI", "execution result: $result")
+                        onStatusUpdate("result: $result")
+                    }
+                }
 
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -269,47 +386,45 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun parseCommandFromResponse(response: String): JSONObject {
+    private fun callOpenAI(apiKey: String, payload: JSONObject): String {
+        val url = URL("https://api.openai.com/v1/chat/completions")
+        val conn = url.openConnection() as HttpURLConnection
+        conn.requestMethod = "POST"
+        conn.setRequestProperty("Content-Type", "application/json")
+        conn.setRequestProperty("Authorization", "Bearer $apiKey")
+        conn.doOutput = true
+
+        conn.outputStream.use {
+            it.write(payload.toString().toByteArray())
+        }
+        Log.d("openAI", "Prompt: $payload")
+
+        val response = conn.inputStream.bufferedReader().readText()
+        Log.d("openAI", "Raw response: $response")
+
         val root = JSONObject(response)
-        val content = root.getJSONArray("choices")
-            .getJSONObject(0)
-            .getJSONObject("message")
-            .getString("content")
+        val content =
+            root.getJSONArray("choices")
+                .getJSONObject(0)
+                .getJSONObject("message")
+                .getString("content")
 
-        val jsonStart = content.indexOf('{')
-        val jsonEnd = content.lastIndexOf('}') + 1
-        val json = content.substring(jsonStart, jsonEnd)
-
-        return JSONObject(json)
+        return content.trim()
     }
 
-    private fun executeCommand(command: JSONObject) {
-        val pkg = command.getString("package")
-        val serviceClass = command.getString("service")
-        val commandJson = command.getString("commandJson")
-
-        boundPackage = pkg
-        val intent = Intent().apply {
-            component = ComponentName(pkg, serviceClass)
+    private fun executeCommand(command: JSONObject, onResult: (String) -> Unit) {
+        if (!isBound || commandGateway == null) {
+            onResult("Service not connected")
+            return
         }
 
-        // Optional: check service exists
-        val resolved = packageManager.resolveService(intent, 0) ?: return
-        Log.d(
-            "executeCommand",
-            "check service exists: $resolved"
-        )
-
-        bindService(intent, serviceConnection, BIND_AUTO_CREATE)
-
-        // Small delay to ensure service binding
-        Handler(mainLooper).postDelayed({
-            try {
-                commandGateway?.invoke(commandJson)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }, 500)
+        try {
+            val resultJson = commandGateway!!.invoke(command.getJSONObject("commandJson").toString())
+            val msg = JSONObject(resultJson).optString("message", resultJson)
+            onResult(msg)
+        } catch (e: Exception) {
+            onResult("Error: ${e.message}")
+        }
     }
 
     /* ===================== Compose UI ===================== */
@@ -319,6 +434,19 @@ class MainActivity : ComponentActivity() {
         var status by remember { mutableStateOf("Idle") }
         val messages = remember { mutableStateListOf<ChatMessage>() }
         val scope = rememberCoroutineScope()
+        val listState = rememberLazyListState()
+
+        // Run once when the composable first enters composition
+        LaunchedEffect(Unit) {
+            messages.add(ChatMessage("I'm a chat bot to help operate other apps.", isUser = false))
+        }
+
+        // Auto-scroll when new message added
+        LaunchedEffect(messages.size) {
+            if (messages.isNotEmpty()) {
+                listState.animateScrollToItem(messages.size - 1)
+            }
+        }
 
         val speechLauncher = rememberLauncherForActivityResult(
             ActivityResultContracts.StartActivityForResult()
@@ -342,7 +470,8 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                reverseLayout = false
+//                reverseLayout = false
+                state = listState
             ) {
                 items(messages) { msg ->
                     ChatBubble(msg)

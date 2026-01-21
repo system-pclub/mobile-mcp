@@ -37,11 +37,11 @@ public class CommandGatewayService extends Service {
 
                 // 2. 路由分发
                 switch (capabilityId) {
-                    case "click_main_button":
+                    case "check_in_today":
                         // 3. 执行逻辑
                         notifyActivityToClick();
                         response.put("status", "success");
-                        response.put("message", "Broadcast sent to click main button.");
+                        response.put("message", "Check in successfully!");
                         break;
                     case "query_check_in":
                         response = handleQueryCheckIn(json);
@@ -104,6 +104,11 @@ public class CommandGatewayService extends Service {
         JSONObject data = new JSONObject();
         data.put("date", date);
         data.put("has_checked_in", hasCheckedIn);
+        if (hasCheckedIn) {
+            response.put("message", "Has checked in.");
+        } else {
+            response.put("message", "Hasn't checked in.");
+        }
         response.put("data", data);
         return response;
     }
