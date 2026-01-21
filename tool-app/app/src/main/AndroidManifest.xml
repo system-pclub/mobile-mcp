@@ -10,7 +10,8 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MCPDemo">
+        android:theme="@style/Theme.MCPDemo"
+        android:description="@string/app_desc">
 
         <activity
             android:name=".MainActivity"
@@ -21,21 +22,29 @@
             </intent-filter>
         </activity>
 
-
         <!-- 注册对外服务的 Service -->
         <service
             android:name=".CommandGatewayService"
             android:enabled="true"
             android:exported="true"
             tools:ignore="ExportedService">
-            <intent-filter>
-                <action android:name="com.example.mcpdemo.COMMAND_GATEWAY" />
-            </intent-filter>
 
-            <!-- 告诉大模型该应用可以被ai调用 -->
+            <!-- 应用级别的元数据 -->
+            <meta-data
+                android:name="mcp.application.name"
+                android:value="Daily Check-in" />
+            <meta-data
+                android:name="mcp.application.description"
+                android:value="@string/app_desc" />
+
+            <!-- 工具级别的元数据 -->
             <meta-data
                 android:name="mcp.capabilities"
                 android:resource="@xml/mcp_capabilities" />
+
+            <intent-filter>
+                <action android:name="com.example.mcpdemo.COMMAND_GATEWAY" />
+            </intent-filter>
         </service>
 
     </application>

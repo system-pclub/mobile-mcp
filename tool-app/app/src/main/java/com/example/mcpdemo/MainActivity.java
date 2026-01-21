@@ -4,27 +4,40 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.widget.Button;
+import android.widget.GridLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
-
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
     private Button myButton;
+    private TextView tvStatus;
+    private TextView tvConsecutive;
+    private TextView tvMonthTitle;
+    private GridLayout calendarGrid;
+    private TextView tvLog;
 
-    // BroadcastReceiver to listen for commands from the service
-    private final BroadcastReceiver commandReceiver = new BroadcastReceiver() {
+    private CheckInManager checkInManager;
+    private Calendar currentCalendar;
+    private SimpleDateFormat monthFormat;
+    private SimpleDateFormat dayFormat;
+    private SimpleDateFormat logTimeFormat;
+
+    // 广播接收器：听到 Service 喊话就执行（用于AI远程触发）
+    private final BroadcastReceiver aiCommandReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (CommandGatewayService.ACTION_PERFORM_CHECK_IN.equals(intent.getAction())) {
-                // Perform a click on the button when the command is received
+            if ("ACTION_AI_CLICK".equals(intent.getAction())) {
                 if (myButton != null) {
                     myButton.performClick();
                 }
@@ -37,33 +50,207 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Get view components
+        // 初始化组件
         myButton = findViewById(R.id.btn_action);
-        TextView logTextView = findViewById(R.id.log);
-        TextView dateTextView = findViewById(R.id.tv_date);
-        TextView greetingTextView = findViewById(R.id.tv_greeting);
+        tvStatus = findViewById(R.id.tv_status);
+        tvConsecutive = findViewById(R.id.tv_consecutive);
+        tvMonthTitle = findViewById(R.id.tv_month_title);
+        calendarGrid = findViewById(R.id.calendar_grid);
+        tvLog = findViewById(R.id.tv_log);
+        Button btnPrevMonth = findViewById(R.id.btn_prev_month);
+        Button btnNextMonth = findViewById(R.id.btn_next_month);
 
-        // Set current date
-        String currentDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
-        dateTextView.setText(currentDate);
+        // 初始化打卡管理器
+        checkInManager = new CheckInManager(this);
+        // 每次启动时重置数据
+        checkInManager.resetCheckInData();
 
-        // Set the click listener for the check-in button
+        // 初始化日期格式化
+        monthFormat = new SimpleDateFormat("yyyy年 M月", Locale.CHINA);
+        dayFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        logTimeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+
+        // 初始化日历
+        currentCalendar = Calendar.getInstance();
+
+        // 设置打卡按钮点击逻辑
         myButton.setOnClickListener(v -> {
-            String currentTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
-            String logMessage = currentTime + " " + getString(R.string.check_in_success) + "\n";
-            logTextView.append(logMessage);
-            Toast.makeText(this, getString(R.string.check_in_success), Toast.LENGTH_SHORT).show();
+            if (checkInManager.hasCheckedInToday()) {
+                addLog("今日已经打过卡");
+                Toast.makeText(MainActivity.this, "您今天已经打过卡了", Toast.LENGTH_SHORT).show();
+            } else {
+                checkInManager.checkInToday();
+                updateCheckInStatus();
+                refreshCalendar();
+                addLog("今日打卡成功");
+            }
         });
 
-        // Register the BroadcastReceiver
-        IntentFilter filter = new IntentFilter(CommandGatewayService.ACTION_PERFORM_CHECK_IN);
-        ContextCompat.registerReceiver(this, commandReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
+        // 上一月按钮
+        btnPrevMonth.setOnClickListener(v -> {
+            currentCalendar.add(Calendar.MONTH, -1);
+            refreshCalendar();
+        });
+
+        // 下一月按钮
+        btnNextMonth.setOnClickListener(v -> {
+            currentCalendar.add(Calendar.MONTH, 1);
+            refreshCalendar();
+        });
+
+        // 初始化显示
+        updateCheckInStatus();
+        refreshCalendar();
+        addLog("应用已启动");
+
+        // 注册AI指令广播
+        IntentFilter filter = new IntentFilter("ACTION_AI_CLICK");
+        ContextCompat.registerReceiver(this, aiCommandReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
+    }
+
+    /**
+     * 添加日志条目
+     */
+    private void addLog(String message) {
+        String currentTime = logTimeFormat.format(new Date());
+        String logMessage = currentTime + ": " + message + "\n";
+        tvLog.append(logMessage);
+    }
+
+    /**
+     * 更新打卡状态显示
+     */
+    private void updateCheckInStatus() {
+        if (checkInManager.hasCheckedInToday()) {
+            tvStatus.setText(R.string.today_checked);
+            tvStatus.setTextColor(Color.parseColor("#1E8E3E"));
+        } else {
+            tvStatus.setText(R.string.today_not_checked);
+            tvStatus.setTextColor(Color.parseColor("#D93025"));
+        }
+
+        int consecutive = checkInManager.getConsecutiveCheckInDays();
+        tvConsecutive.setText(String.format(getString(R.string.consecutive_days), consecutive));
+    }
+
+    /**
+     * 刷新日历显示
+     */
+    private void refreshCalendar() {
+        tvMonthTitle.setText(monthFormat.format(currentCalendar.getTime()));
+        calendarGrid.removeAllViews();
+
+        int year = currentCalendar.get(Calendar.YEAR);
+        int month = currentCalendar.get(Calendar.MONTH) + 1;
+        HashMap<Integer, Boolean> checkInData = checkInManager.getMonthCheckInData(year, month);
+
+        Calendar cal = (Calendar) currentCalendar.clone();
+        cal.set(Calendar.DAY_OF_MONTH, 1);
+        int firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY;
+        if (firstDayOfWeek < 0) firstDayOfWeek += 7;
+
+        int lastDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+
+        for (int i = 0; i < firstDayOfWeek; i++) {
+            calendarGrid.addView(createDayView("", false, false, false));
+        }
+
+        for (int day = 1; day <= lastDay; day++) {
+            boolean isCheckedIn = Boolean.TRUE.equals(checkInData.get(day));
+            boolean isToday = isToday(year, month, day);
+            boolean isPast = isPast(year, month, day);
+
+            TextView dayView = createDayView(String.valueOf(day), isCheckedIn, isToday, isPast);
+
+            // 只为过去的、未打卡日期设置长按补卡
+            if (isPast && !isCheckedIn) {
+                final int finalDay = day;
+                dayView.setOnLongClickListener(v -> {
+                    showMakeUpCheckInDialog(year, month, finalDay);
+                    return true;
+                });
+            }
+            calendarGrid.addView(dayView);
+        }
+    }
+
+    /**
+     * 创建日期视图，并根据状态美化
+     */
+    private TextView createDayView(String day, boolean isCheckedIn, boolean isToday, boolean isPast) {
+        TextView textView = new TextView(this);
+        textView.setText(day);
+        textView.setTextSize(14);
+        textView.setGravity(android.view.Gravity.CENTER);
+        
+        GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+        params.width = 0;
+        params.height = 120; // Fixed height for a better grid look
+        params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+        params.setMargins(4, 4, 4, 4);
+        textView.setLayoutParams(params);
+
+        if (!day.isEmpty()) {
+            if (isToday) {
+                textView.setTextColor(Color.WHITE);
+                textView.setBackgroundColor(isCheckedIn ? Color.parseColor("#34A853") : Color.parseColor("#4285F4"));
+            } else if (isCheckedIn) {
+                textView.setTextColor(Color.parseColor("#1E8E3E"));
+                textView.setBackgroundColor(Color.parseColor("#E6F4EA"));
+            } else if (isPast) {
+                textView.setTextColor(Color.parseColor("#3C4043"));
+                textView.setBackgroundColor(Color.parseColor("#F1F3F4"));
+            } else { // Future
+                textView.setTextColor(Color.parseColor("#70757A"));
+                textView.setBackgroundColor(Color.TRANSPARENT);
+            }
+        }
+        return textView;
+    }
+
+    private boolean isToday(int year, int month, int day) {
+        Calendar today = Calendar.getInstance();
+        return today.get(Calendar.YEAR) == year && today.get(Calendar.MONTH) + 1 == month && today.get(Calendar.DAY_OF_MONTH) == day;
+    }
+
+    private boolean isPast(int year, int month, int day) {
+        Calendar target = Calendar.getInstance();
+        target.set(year, month - 1, day);
+        Calendar today = Calendar.getInstance();
+        target.set(Calendar.HOUR_OF_DAY, 0);
+        target.set(Calendar.MINUTE, 0);
+        target.set(Calendar.SECOND, 0);
+        target.set(Calendar.MILLISECOND, 0);
+        today.set(Calendar.HOUR_OF_DAY, 0);
+        today.set(Calendar.MINUTE, 0);
+        today.set(Calendar.SECOND, 0);
+        today.set(Calendar.MILLISECOND, 0);
+        return target.before(today);
+    }
+
+    /**
+     * 显示补卡对话框
+     */
+    private void showMakeUpCheckInDialog(int year, int month, int day) {
+        Calendar cal = Calendar.getInstance();
+        cal.set(year, month - 1, day);
+        String dateStr = dayFormat.format(cal.getTime());
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("补卡")
+                .setMessage("确认为 " + dateStr + " 补卡？")
+                .setPositiveButton("确认", (dialog, which) -> {
+                    checkInManager.checkInDate(dateStr);
+                    refreshCalendar();
+                    addLog("补卡成功：" + dateStr);
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Unregister the receiver to prevent memory leaks
-        unregisterReceiver(commandReceiver);
+        unregisterReceiver(aiCommandReceiver);
     }
 }
