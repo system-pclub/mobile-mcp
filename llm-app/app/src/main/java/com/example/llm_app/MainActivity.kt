@@ -414,7 +414,29 @@ class MainActivity : ComponentActivity() {
 
     private fun executeCommand(command: JSONObject, onResult: (String) -> Unit) {
         if (!isBound || commandGateway == null) {
-            onResult("Service not connected")
+            Log.w("executeCommand", "Service disconnected, attempting rebind...")
+            try {
+                bindService(gatewayIntent, serviceConnection, BIND_AUTO_CREATE)
+            } catch (e: Exception) {
+                Log.e("executeCommand", "Rebind failed", e)
+            }
+
+            // Simple blocking wait since we are on a background thread (Dispatchers.IO)
+            for (i in 0 until 5) {
+                try {
+                    Thread.sleep(500)
+                } catch (e: InterruptedException) {
+                    e.printStackTrace()
+                }
+                if (isBound && commandGateway != null) {
+                    Log.d("executeCommand", "Service reconnected successfully")
+                    break
+                }
+            }
+        }
+
+        if (!isBound || commandGateway == null) {
+            onResult("Service not connected (rebind failed)")
             return
         }
 

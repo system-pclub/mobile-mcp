@@ -37,10 +37,16 @@ public class MainActivity extends AppCompatActivity {
     private final BroadcastReceiver aiCommandReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if ("ACTION_AI_CLICK".equals(intent.getAction())) {
+            String action = intent.getAction();
+            if ("ACTION_AI_CLICK".equals(action)) {
                 if (myButton != null) {
                     myButton.performClick();
                 }
+            } else if ("ACTION_MAKE_UP_CHECK_IN_SUCCESS".equals(action)) {
+                String date = intent.getStringExtra("date");
+                refreshCalendar();
+                updateCheckInStatus();
+                addLog("Make-up check-in successful: " + date);
             }
         }
     };
@@ -66,7 +72,7 @@ public class MainActivity extends AppCompatActivity {
         checkInManager.resetCheckInData();
 
         // 初始化日期格式化
-        monthFormat = new SimpleDateFormat("yyyy年 M月", Locale.CHINA);
+        monthFormat = new SimpleDateFormat("MMM yyyy", Locale.getDefault());
         dayFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         logTimeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
 
@@ -76,13 +82,13 @@ public class MainActivity extends AppCompatActivity {
         // 设置打卡按钮点击逻辑
         myButton.setOnClickListener(v -> {
             if (checkInManager.hasCheckedInToday()) {
-                addLog("今日已经打过卡");
-                Toast.makeText(MainActivity.this, "您今天已经打过卡了", Toast.LENGTH_SHORT).show();
+                addLog("Already checked in today");
+                Toast.makeText(MainActivity.this, "You have already checked in today", Toast.LENGTH_SHORT).show();
             } else {
                 checkInManager.checkInToday();
                 updateCheckInStatus();
                 refreshCalendar();
-                addLog("今日打卡成功");
+                addLog("Checked in successfully today");
             }
         });
 
@@ -101,10 +107,12 @@ public class MainActivity extends AppCompatActivity {
         // 初始化显示
         updateCheckInStatus();
         refreshCalendar();
-        addLog("应用已启动");
+        addLog("Application started");
 
         // 注册AI指令广播
-        IntentFilter filter = new IntentFilter("ACTION_AI_CLICK");
+        IntentFilter filter = new IntentFilter();
+        filter.addAction("ACTION_AI_CLICK");
+        filter.addAction("ACTION_MAKE_UP_CHECK_IN_SUCCESS");
         ContextCompat.registerReceiver(this, aiCommandReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
@@ -237,14 +245,14 @@ public class MainActivity extends AppCompatActivity {
         String dateStr = dayFormat.format(cal.getTime());
 
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("补卡")
-                .setMessage("确认为 " + dateStr + " 补卡？")
-                .setPositiveButton("确认", (dialog, which) -> {
+                .setTitle("Make-up Check-in")
+                .setMessage("Confirm make-up check-in for " + dateStr + "?")
+                .setPositiveButton("Confirm", (dialog, which) -> {
                     checkInManager.checkInDate(dateStr);
                     refreshCalendar();
-                    addLog("补卡成功：" + dateStr);
+                    addLog("Make-up check-in successful: " + dateStr);
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton("Cancel", null)
                 .show();
     }
 

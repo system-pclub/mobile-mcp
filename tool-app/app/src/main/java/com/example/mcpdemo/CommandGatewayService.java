@@ -16,7 +16,7 @@ public class CommandGatewayService extends Service {
     private final ICommandGateway.Stub binder = new ICommandGateway.Stub() {
         @Override
         public String invoke(String commandJson) throws RemoteException {
-            Log.d("MCP", "收到指令: " + commandJson);
+            Log.d("MCP", "Received command: " + commandJson);
             JSONObject response = new JSONObject();
 
             // 判空检查，增加健壮性
@@ -50,13 +50,13 @@ public class CommandGatewayService extends Service {
                         response = handleMakeUpCheckIn(json);
                         break;
                     default:
-                        Log.e("MCP", "收到未知能力ID: " + capabilityId);
+                        Log.e("MCP", "Received unknown capability ID: " + capabilityId);
                         response.put("status", "error");
                         response.put("message", "Unknown capability ID: " + capabilityId);
                         break;
                 }
             } catch (Exception e) {
-                Log.e("MCP", "JSON解析或执行异常", e);
+                Log.e("MCP", "JSON parsing or execution exception", e);
                 try {
                     response.put("status", "error");
                     response.put("message", e.getMessage());
@@ -97,7 +97,7 @@ public class CommandGatewayService extends Service {
         String date = json.optString("date", "");
         boolean hasCheckedIn = checkInManager.hasCheckedIn(date);
 
-        Log.d("MCP", "查询 " + date + " 打卡状态: " + hasCheckedIn);
+        Log.d("MCP", "Query " + date + " check-in status: " + hasCheckedIn);
 
         JSONObject response = new JSONObject();
         response.put("status", "success");
@@ -122,7 +122,7 @@ public class CommandGatewayService extends Service {
         String date = json.optString("date", "");
         checkInManager.checkInDate(date);
 
-        Log.d("MCP", "为 " + date + " 补卡");
+        Log.d("MCP", "Make up check-in for " + date);
 
         // 发送广播通知 UI 更新
         Intent intent = new Intent("ACTION_MAKE_UP_CHECK_IN_SUCCESS");
@@ -132,9 +132,10 @@ public class CommandGatewayService extends Service {
 
         JSONObject response = new JSONObject();
         response.put("status", "success");
+        response.put("message", "Make up check-in successful for " + date); // Unify: add message to the outermost layer
+
         JSONObject data = new JSONObject();
         data.put("date", date);
-        data.put("message", "Make up check-in successful for " + date);
         response.put("data", data);
         return response;
     }

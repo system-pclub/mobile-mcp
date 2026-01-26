@@ -3,13 +3,13 @@
     <string name="app_desc">An application for daily clocking in and managing records. You can perform check-ins, view check-in records, and make up for missed check-ins.</string>
     <string name="waiting">waiting...</string>
     <string name="click_me">click me</string>
-    <string name="check_in">打卡</string>
-    <string name="calendar">日历</string>
-    <string name="today_checked">今天已打卡</string>
-    <string name="today_not_checked">今天未打卡</string>
-    <string name="consecutive_days">连续打卡: %d 天</string>
-    <string name="month_calendar">%d 年 %d 月</string>
-    <string name="make_up_check_in">补卡</string>
-    <string name="checked_in">已打卡</string>
-    <string name="not_checked_in">未打卡</string>
+    <string name="check_in">Check in</string>
+    <string name="calendar">Calendar</string>
+    <string name="today_checked">Checked in today</string>
+    <string name="today_not_checked">Not checked in today</string>
+    <string name="consecutive_days">Consecutive check-ins: %d days</string>
+    <string name="month_calendar">Year %d Month %d</string>
+    <string name="make_up_check_in">Make up check-in</string>
+    <string name="checked_in">Checked in</string>
+    <string name="not_checked_in">Not checked in</string>
 </resources>
