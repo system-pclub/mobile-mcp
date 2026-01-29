@@ -5,27 +5,27 @@
         description="Click the action button on the main screen, and then the text will display on the bottom of the screen."
         version="1" />
     <capability
-        id="query_check_in"
-        description="Query whether a specific date has been checked in."
+        id="query_clock_in"
+        description="Query whether a specific date has been clocked in."
         version="1">
         <input>
             <param name="date" type="string" required="true" description="Date to query in format yyyy-MM-dd" />
         </input>
         <output>
             <param name="date" type="string" description="The queried date" />
-            <param name="has_checked_in" type="boolean" description="Whether the date has been checked in" />
+            <param name="has_clocked_in" type="boolean" description="Whether the date has been clocked in" />
         </output>
     </capability>
     <capability
-        id="make_up_check_in"
-        description="Make up a check-in for a specific date."
+        id="make_up_clock_in"
+        description="Make up a clock-in for a specific date."
         version="1">
         <input>
-            <param name="date" type="string" required="true" description="Date to make up check-in in format yyyy-MM-dd" />
+            <param name="date" type="string" required="true" description="Date to make up clock-in in format yyyy-MM-dd" />
         </input>
         <output>
-            <param name="date" type="string" description="The date that was checked in" />
-            <param name="success" type="boolean" description="Whether the make-up check-in was successful" />
+            <param name="date" type="string" description="The date that was clocked in" />
+            <param name="success" type="boolean" description="Whether the make-up clock-in was successful" />
         </output>
     </capability>
 </mcp>

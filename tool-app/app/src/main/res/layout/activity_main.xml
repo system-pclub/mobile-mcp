@@ -15,7 +15,7 @@
         android:layout_alignParentBottom="true"
         android:layout_margin="16dp"
         android:padding="16dp"
-        android:text="@string/check_in"
+        android:text="@string/clock_in"
         android:textSize="18sp" />
 
     <!-- 主要内容区域（在打卡按钮之上） -->
@@ -104,7 +104,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_marginTop="16dp"
-            android:text="打卡记录："
+            android:text="Clock-in Record："
             android:textStyle="bold" />
 
         <ScrollView

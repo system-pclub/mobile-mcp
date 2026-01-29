@@ -4,14 +4,12 @@ plugins {
 
 android {
     namespace 'com.example.mcpdemo'
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.example.mcpdemo"
         minSdk 24
-        targetSdk 36
+        targetSdk 35
         versionCode 1
         versionName "1.0"
 

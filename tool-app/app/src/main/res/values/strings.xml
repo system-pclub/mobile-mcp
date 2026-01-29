@@ -1,15 +1,15 @@
 <resources>
     <string name="app_name">MCP Demo</string>
-    <string name="app_desc">An application for daily clocking in and managing records. You can perform check-ins, view check-in records, and make up for missed check-ins.</string>
+    <string name="app_desc">An application for daily clocking in and managing records. You can perform clock-ins, view clock-in records, and make up for missed clock-ins.</string>
     <string name="waiting">waiting...</string>
     <string name="click_me">click me</string>
-    <string name="check_in">Check in</string>
+    <string name="clock_in">Clock in</string>
     <string name="calendar">Calendar</string>
-    <string name="today_checked">Checked in today</string>
-    <string name="today_not_checked">Not checked in today</string>
-    <string name="consecutive_days">Consecutive check-ins: %d days</string>
+    <string name="today_clocked">Clocked in today</string>
+    <string name="today_not_clocked">Not clocked in today</string>
+    <string name="consecutive_days">Consecutive clock-ins: %d days</string>
     <string name="month_calendar">Year %d Month %d</string>
-    <string name="make_up_check_in">Make up check-in</string>
-    <string name="checked_in">Checked in</string>
-    <string name="not_checked_in">Not checked in</string>
+    <string name="make_up_clock_in">Make up clock-in</string>
+    <string name="clocked_in">Clocked in</string>
+    <string name="not_clocked_in">Not clocked in</string>
 </resources>

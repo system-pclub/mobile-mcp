@@ -27,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private GridLayout calendarGrid;
     private TextView tvLog;
 
-    private CheckInManager checkInManager;
+    private ClockInManager clockInManager;
     private Calendar currentCalendar;
     private SimpleDateFormat monthFormat;
     private SimpleDateFormat dayFormat;
@@ -42,11 +42,11 @@ public class MainActivity extends AppCompatActivity {
                 if (myButton != null) {
                     myButton.performClick();
                 }
-            } else if ("ACTION_MAKE_UP_CHECK_IN_SUCCESS".equals(action)) {
+            } else if ("ACTION_MAKE_UP_CLOCK_IN_SUCCESS".equals(action)) {
                 String date = intent.getStringExtra("date");
                 refreshCalendar();
-                updateCheckInStatus();
-                addLog("Make-up check-in successful: " + date);
+                updateClockInStatus();
+                addLog("Make-up clock-in successful: " + date);
             }
         }
     };
@@ -67,9 +67,9 @@ public class MainActivity extends AppCompatActivity {
         Button btnNextMonth = findViewById(R.id.btn_next_month);
 
         // 初始化打卡管理器
-        checkInManager = new CheckInManager(this);
+        clockInManager = new ClockInManager(this);
         // 每次启动时重置数据
-        checkInManager.resetCheckInData();
+        clockInManager.resetClockInData();
 
         // 初始化日期格式化
         monthFormat = new SimpleDateFormat("MMM yyyy", Locale.getDefault());
@@ -81,14 +81,14 @@ public class MainActivity extends AppCompatActivity {
 
         // 设置打卡按钮点击逻辑
         myButton.setOnClickListener(v -> {
-            if (checkInManager.hasCheckedInToday()) {
-                addLog("Already checked in today");
-                Toast.makeText(MainActivity.this, "You have already checked in today", Toast.LENGTH_SHORT).show();
+            if (clockInManager.hasClockedInToday()) {
+                addLog("Already clocked in today");
+                Toast.makeText(MainActivity.this, "You have already clocked in today", Toast.LENGTH_SHORT).show();
             } else {
-                checkInManager.checkInToday();
-                updateCheckInStatus();
+                clockInManager.clockInToday();
+                updateClockInStatus();
                 refreshCalendar();
-                addLog("Checked in successfully today");
+                addLog("Clocked in successfully today");
             }
         });
 
@@ -105,14 +105,14 @@ public class MainActivity extends AppCompatActivity {
         });
 
         // 初始化显示
-        updateCheckInStatus();
+        updateClockInStatus();
         refreshCalendar();
         addLog("Application started");
 
         // 注册AI指令广播
         IntentFilter filter = new IntentFilter();
         filter.addAction("ACTION_AI_CLICK");
-        filter.addAction("ACTION_MAKE_UP_CHECK_IN_SUCCESS");
+        filter.addAction("ACTION_MAKE_UP_CLOCK_IN_SUCCESS");
         ContextCompat.registerReceiver(this, aiCommandReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
@@ -128,16 +128,16 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 更新打卡状态显示
      */
-    private void updateCheckInStatus() {
-        if (checkInManager.hasCheckedInToday()) {
-            tvStatus.setText(R.string.today_checked);
+    private void updateClockInStatus() {
+        if (clockInManager.hasClockedInToday()) {
+            tvStatus.setText(R.string.today_clocked);
             tvStatus.setTextColor(Color.parseColor("#1E8E3E"));
         } else {
-            tvStatus.setText(R.string.today_not_checked);
+            tvStatus.setText(R.string.today_not_clocked);
             tvStatus.setTextColor(Color.parseColor("#D93025"));
         }
 
-        int consecutive = checkInManager.getConsecutiveCheckInDays();
+        int consecutive = clockInManager.getConsecutiveClockInDays();
         tvConsecutive.setText(String.format(getString(R.string.consecutive_days), consecutive));
     }
 
@@ -150,7 +150,7 @@ public class MainActivity extends AppCompatActivity {
 
         int year = currentCalendar.get(Calendar.YEAR);
         int month = currentCalendar.get(Calendar.MONTH) + 1;
-        HashMap<Integer, Boolean> checkInData = checkInManager.getMonthCheckInData(year, month);
+        HashMap<Integer, Boolean> clockInData = clockInManager.getMonthClockInData(year, month);
 
         Calendar cal = (Calendar) currentCalendar.clone();
         cal.set(Calendar.DAY_OF_MONTH, 1);
@@ -164,17 +164,17 @@ public class MainActivity extends AppCompatActivity {
         }
 
         for (int day = 1; day <= lastDay; day++) {
-            boolean isCheckedIn = Boolean.TRUE.equals(checkInData.get(day));
+            boolean isClockedIn = Boolean.TRUE.equals(clockInData.get(day));
             boolean isToday = isToday(year, month, day);
             boolean isPast = isPast(year, month, day);
 
-            TextView dayView = createDayView(String.valueOf(day), isCheckedIn, isToday, isPast);
+            TextView dayView = createDayView(String.valueOf(day), isClockedIn, isToday, isPast);
 
             // 只为过去的、未打卡日期设置长按补卡
-            if (isPast && !isCheckedIn) {
+            if (isPast && !isClockedIn) {
                 final int finalDay = day;
                 dayView.setOnLongClickListener(v -> {
-                    showMakeUpCheckInDialog(year, month, finalDay);
+                    showMakeUpClockInDialog(year, month, finalDay);
                     return true;
                 });
             }
@@ -185,7 +185,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 创建日期视图，并根据状态美化
      */
-    private TextView createDayView(String day, boolean isCheckedIn, boolean isToday, boolean isPast) {
+    private TextView createDayView(String day, boolean isClockedIn, boolean isToday, boolean isPast) {
         TextView textView = new TextView(this);
         textView.setText(day);
         textView.setTextSize(14);
@@ -201,8 +201,8 @@ public class MainActivity extends AppCompatActivity {
         if (!day.isEmpty()) {
             if (isToday) {
                 textView.setTextColor(Color.WHITE);
-                textView.setBackgroundColor(isCheckedIn ? Color.parseColor("#34A853") : Color.parseColor("#4285F4"));
-            } else if (isCheckedIn) {
+                textView.setBackgroundColor(isClockedIn ? Color.parseColor("#34A853") : Color.parseColor("#4285F4"));
+            } else if (isClockedIn) {
                 textView.setTextColor(Color.parseColor("#1E8E3E"));
                 textView.setBackgroundColor(Color.parseColor("#E6F4EA"));
             } else if (isPast) {
@@ -239,18 +239,18 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 显示补卡对话框
      */
-    private void showMakeUpCheckInDialog(int year, int month, int day) {
+    private void showMakeUpClockInDialog(int year, int month, int day) {
         Calendar cal = Calendar.getInstance();
         cal.set(year, month - 1, day);
         String dateStr = dayFormat.format(cal.getTime());
 
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Make-up Check-in")
-                .setMessage("Confirm make-up check-in for " + dateStr + "?")
+                .setTitle("Make-up Clock-in")
+                .setMessage("Confirm make-up clock-in for " + dateStr + "?")
                 .setPositiveButton("Confirm", (dialog, which) -> {
-                    checkInManager.checkInDate(dateStr);
+                    clockInManager.clockInDate(dateStr);
                     refreshCalendar();
-                    addLog("Make-up check-in successful: " + dateStr);
+                    addLog("Make-up clock-in successful: " + dateStr);
                 })
                 .setNegativeButton("Cancel", null)
                 .show();

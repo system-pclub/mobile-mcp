@@ -201,7 +201,7 @@ class MainActivity : ComponentActivity() {
 
                     // Read attributes
                     for (i in 0 until parser.attributeCount) {
-                        sb.append(" ${parser.getAttributeName(i)}=\"${parser.getAttributeValue(i)}\"")
+                        sb.append(" ${parser.getAttributeName(i)}=\"${parser.getAttributeValue(i)}\"" )
                     }
 
                     sb.append(">")
@@ -223,6 +223,9 @@ class MainActivity : ComponentActivity() {
         recognizedText: String,
         onStatusUpdate: (String) -> Unit
     ) {
+        val overallStartTime = System.currentTimeMillis()
+        Log.d("LatencyTest", "=== Start processing: $overallStartTime ===")
+        
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val apiKey = assets.open("openai_key.txt")
@@ -231,7 +234,10 @@ class MainActivity : ComponentActivity() {
 
                 /* ================= 1️⃣ APP SELECTION ================= */
 //                onStatusUpdate("Selecting target app...")
-
+                val step1Start = System.currentTimeMillis()
+                
+                // [T1] Prompt Prep
+                val t1Start = System.currentTimeMillis()
                 val appList = JSONArray()
                 for ((_, app) in mcpAppMap) {
                     val obj = JSONObject()
@@ -253,7 +259,7 @@ class MainActivity : ComponentActivity() {
                                 You are an MCP app selector.
                                 Given user intent and a list of apps,
                                 return only JSON:
-                                { "package": "xxx" }
+                                { \"package\": \"xxx\" }
                                 """.trimIndent()
                                 )
                             })
@@ -262,7 +268,7 @@ class MainActivity : ComponentActivity() {
                                 put(
                                     "content",
                                     """
-                                User intent: "$recognizedText"
+                                User intent: \"$recognizedText\"
                                 Available apps:
                                 $appList
                                 """.trimIndent()
@@ -271,20 +277,34 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
+                val t1End = System.currentTimeMillis()
+                Log.d("LatencyTest", "[T1] App Select Prompt Prep: ${t1End - t1Start}ms")
 
-                val selectedPackage = callOpenAI(apiKey, appSelectPrompt)
-                    .let { JSONObject(it).getString("package") }
+                // [T2] LLM Network
+                val t2Start = System.currentTimeMillis()
+                val responseStr = callOpenAI(apiKey, appSelectPrompt)
+                val t2End = System.currentTimeMillis()
+                Log.d("LatencyTest", "[T2] App Select LLM Network: ${t2End - t2Start}ms")
 
+                // [T3] Parse & Lookup
+                val t3Start = System.currentTimeMillis()
+                val selectedPackage = JSONObject(responseStr).getString("package")
                 val selectedApp = mcpAppMap[selectedPackage]
                     ?: throw IllegalStateException("Package not found: $selectedPackage")
-
+                val t3End = System.currentTimeMillis()
+                Log.d("LatencyTest", "[T3] App Select Parse & Lookup: ${t3End - t3Start}ms")
+                
                 Log.d("openAI", "Selected package: $selectedPackage, app name: ${selectedApp.appName}")
                 onStatusUpdate("Select target app: ${selectedApp.appName} (${selectedApp.appDescription})")
+
 
                 /* ================= 2️⃣ SERVICE + CAPABILITY ================= */
 
 //                onStatusUpdate("Selecting service and capability...")
+                val step2Start = System.currentTimeMillis()
 
+                // [T4] Capability Prompt Prep
+                val t4Start = System.currentTimeMillis()
                 val serviceList = JSONArray()
                 for (cap in selectedApp.capabilities) {
                     val obj = JSONObject()
@@ -323,7 +343,7 @@ class MainActivity : ComponentActivity() {
                                     "content",
                                     """
                                 Today is: $today
-                                User intent: "$recognizedText"
+                                User intent: \"$recognizedText\"
                                 Services:
                                 $serviceList
                                 """.trimIndent()
@@ -332,23 +352,18 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
+                val t4End = System.currentTimeMillis()
+                Log.d("LatencyTest", "[T4] Capability Prompt Prep: ${t4End - t4Start}ms")
 
+                // [T5] LLM Network (Capability)
+                val t5Start = System.currentTimeMillis()
                 val commandJsonStr = callOpenAI(apiKey, capabilityPrompt)
+                val t5End = System.currentTimeMillis()
+                Log.d("LatencyTest", "[T5] Capability LLM Network: ${t5End - t5Start}ms")
+                
+                // [T6] Parse & Reconstruct
+                val t6Start = System.currentTimeMillis()
                 val commandObj = JSONObject(commandJsonStr)
-
-                /* ================= 3️⃣ FINAL COMMAND ================= */
-
-//                val finalCommand = JSONObject().apply {
-//                    put("package", selectedPackage)
-//                    put("service", commandObj.getString("service"))
-//                    put(
-//                        "commandJson", JSONObject().apply {
-//                            put("capability", commandObj.getString("capability"))
-//                            put("args", commandObj.getJSONObject("args"))
-//                        }
-//                    )
-//                }
-
                 val argsObj = commandObj.getJSONObject("args")
 
                 val commandJson = JSONObject().apply {
@@ -368,11 +383,20 @@ class MainActivity : ComponentActivity() {
                     put("service", commandObj.getString("service"))
                     put("commandJson", commandJson)
                 }
+                val t6End = System.currentTimeMillis()
+                Log.d("LatencyTest", "[T6] Capability Parse & Reconstruct: ${t6End - t6Start}ms")
 
                 Log.d("openAI", "Final command: $finalCommand")
-
                 onStatusUpdate("Executing command: ${commandObj.getString("capability")}")
+                
+                
+                /* ================= 3️⃣ EXECUTION ================= */
+                // T7 & T8 handled inside executeCommand
+                
                 executeCommand(finalCommand) { result ->
+                    val endTime = System.currentTimeMillis()
+                    Log.d("LatencyTest", "=== Total Duration: ${endTime - overallStartTime}ms ===")
+                    
                     runOnUiThread {
                         Log.d("openAI", "execution result: $result")
                         onStatusUpdate("result: $result")
@@ -387,6 +411,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun callOpenAI(apiKey: String, payload: JSONObject): String {
+        val startNet = System.currentTimeMillis()
         val url = URL("https://api.openai.com/v1/chat/completions")
         val conn = url.openConnection() as HttpURLConnection
         conn.requestMethod = "POST"
@@ -400,6 +425,10 @@ class MainActivity : ComponentActivity() {
         Log.d("openAI", "Prompt: $payload")
 
         val response = conn.inputStream.bufferedReader().readText()
+        val endNet = System.currentTimeMillis()
+        // Note: This log is inside the method to catch pure network time including read
+        // The calling method also measures it as T2/T5, which includes function call overhead (negligible)
+        
         Log.d("openAI", "Raw response: $response")
 
         val root = JSONObject(response)
@@ -413,6 +442,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun executeCommand(command: JSONObject, onResult: (String) -> Unit) {
+        val tStart = System.currentTimeMillis()
+        
+        // [T7] Service Bind Wait
         if (!isBound || commandGateway == null) {
             Log.w("executeCommand", "Service disconnected, attempting rebind...")
             try {
@@ -434,6 +466,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        val tAfterBind = System.currentTimeMillis()
+        Log.d("LatencyTest", "[T7] Service Bind Wait: ${tAfterBind - tStart}ms")
 
         if (!isBound || commandGateway == null) {
             onResult("Service not connected (rebind failed)")
@@ -441,7 +475,12 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
+            // [T8] IPC Round Trip
+            val tIPCStart = System.currentTimeMillis()
             val resultJson = commandGateway!!.invoke(command.getJSONObject("commandJson").toString())
+            val tIPCEnd = System.currentTimeMillis()
+            Log.d("LatencyTest", "[T8] IPC Invoke Round Trip: ${tIPCEnd - tIPCStart}ms")
+            
             val msg = JSONObject(resultJson).optString("message", resultJson)
             onResult(msg)
         } catch (e: Exception) {
@@ -495,8 +534,8 @@ class MainActivity : ComponentActivity() {
 //                reverseLayout = false
                 state = listState
             ) {
-                items(messages) { msg ->
-                    ChatBubble(msg)
+                items(messages) {
+                    ChatBubble(it)
                 }
             }
 

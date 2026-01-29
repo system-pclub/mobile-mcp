@@ -10,7 +10,7 @@ import org.json.JSONException;
 
 public class CommandGatewayService extends Service {
 
-    private CheckInManager checkInManager;
+    private ClockInManager clockInManager;
 
     // 实现 AIDL 接口
     private final ICommandGateway.Stub binder = new ICommandGateway.Stub() {
@@ -37,17 +37,17 @@ public class CommandGatewayService extends Service {
 
                 // 2. 路由分发
                 switch (capabilityId) {
-                    case "check_in_today":
+                    case "clock_in_today":
                         // 3. 执行逻辑
                         notifyActivityToClick();
                         response.put("status", "success");
-                        response.put("message", "Check in successfully!");
+                        response.put("message", "Clock in successfully!");
                         break;
-                    case "query_check_in":
-                        response = handleQueryCheckIn(json);
+                    case "query_clock_in":
+                        response = handleQueryClockIn(json);
                         break;
-                    case "make_up_check_in":
-                        response = handleMakeUpCheckIn(json);
+                    case "make_up_clock_in":
+                        response = handleMakeUpClockIn(json);
                         break;
                     default:
                         Log.e("MCP", "Received unknown capability ID: " + capabilityId);
@@ -71,7 +71,7 @@ public class CommandGatewayService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        checkInManager = new CheckInManager(this);
+        clockInManager = new ClockInManager(this);
     }
 
     @Override
@@ -93,21 +93,21 @@ public class CommandGatewayService extends Service {
      *
      * @return JSONObject containing the result
      */
-    private JSONObject handleQueryCheckIn(JSONObject json) throws JSONException {
+    private JSONObject handleQueryClockIn(JSONObject json) throws JSONException {
         String date = json.optString("date", "");
-        boolean hasCheckedIn = checkInManager.hasCheckedIn(date);
+        boolean hasClockedIn = clockInManager.hasClockedIn(date);
 
-        Log.d("MCP", "Query " + date + " check-in status: " + hasCheckedIn);
+        Log.d("MCP", "Query " + date + " clock-in status: " + hasClockedIn);
 
         JSONObject response = new JSONObject();
         response.put("status", "success");
         JSONObject data = new JSONObject();
         data.put("date", date);
-        data.put("has_checked_in", hasCheckedIn);
-        if (hasCheckedIn) {
-            response.put("message", "Has checked in.");
+        data.put("has_clocked_in", hasClockedIn);
+        if (hasClockedIn) {
+            response.put("message", "Has clocked in.");
         } else {
-            response.put("message", "Hasn't checked in.");
+            response.put("message", "Hasn't clocked in.");
         }
         response.put("data", data);
         return response;
@@ -118,21 +118,21 @@ public class CommandGatewayService extends Service {
      *
      * @return JSONObject containing the result
      */
-    private JSONObject handleMakeUpCheckIn(JSONObject json) throws JSONException {
+    private JSONObject handleMakeUpClockIn(JSONObject json) throws JSONException {
         String date = json.optString("date", "");
-        checkInManager.checkInDate(date);
+        clockInManager.clockInDate(date);
 
-        Log.d("MCP", "Make up check-in for " + date);
+        Log.d("MCP", "Make up clock-in for " + date);
 
         // 发送广播通知 UI 更新
-        Intent intent = new Intent("ACTION_MAKE_UP_CHECK_IN_SUCCESS");
+        Intent intent = new Intent("ACTION_MAKE_UP_CLOCK_IN_SUCCESS");
         intent.putExtra("date", date);
         intent.setPackage(getPackageName());
         sendBroadcast(intent);
 
         JSONObject response = new JSONObject();
         response.put("status", "success");
-        response.put("message", "Make up check-in successful for " + date); // Unify: add message to the outermost layer
+        response.put("message", "Make up clock-in successful for " + date); // Unify: add message to the outermost layer
 
         JSONObject data = new JSONObject();
         data.put("date", date);

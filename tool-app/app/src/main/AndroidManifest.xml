@@ -32,7 +32,7 @@
             <!-- 应用级别的元数据 -->
             <meta-data
                 android:name="mcp.application.name"
-                android:value="Daily Check-in" />
+                android:value="Daily Clock-in" />
             <meta-data
                 android:name="mcp.application.description"
                 android:value="@string/app_desc" />
