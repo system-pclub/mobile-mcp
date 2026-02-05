@@ -66,39 +66,20 @@ class MainActivity : ComponentActivity() {
 
     val mcpAppMap: MutableMap<String, McpAppInfo> = mutableMapOf()
 
-    // Service binding
-    private var commandGateway: ICommandGateway? = null
-    private var boundPackage: String? = null
+    private data class BoundGateway(
+        val pkg: String,
+        val serviceClass: String,
+        var gateway: ICommandGateway? = null,
+        var isBound: Boolean = false,
+        var pendingCommandJson: String? = null,
+        var pendingResult: ((String) -> Unit)? = null,
+        val connection: ServiceConnection
+    )
 
-    private var pendingCommandJson: String? = null
-    private var pendingResultCallback: ((String) -> Unit)? = null
-
-    private val serviceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            commandGateway = ICommandGateway.Stub.asInterface(service)
-            isBound = true
-            Log.d("executeCommand", "Service connected")
-        }
-
-        override fun onServiceDisconnected(name: ComponentName?) {
-            commandGateway = null
-        }
-    }
-
-    lateinit var gatewayIntent: Intent
-    var isBound = false
+    private val gatewayMap = mutableMapOf<String, BoundGateway>() // key = "$pkg|$service"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        gatewayIntent = Intent().apply {
-            component = ComponentName(
-                "com.example.mcpdemo",
-                "com.example.mcpdemo.CommandGatewayService"
-            )
-        }
-
-        bindService(gatewayIntent, serviceConnection, BIND_AUTO_CREATE)
 
         // 1️⃣ Load MCP capabilities at startup
         retrieveMcpCapabilities()
@@ -432,56 +413,126 @@ class MainActivity : ComponentActivity() {
         Log.d("openAI", "Raw response: $response")
 
         val root = JSONObject(response)
-        val content =
+        var content =
             root.getJSONArray("choices")
                 .getJSONObject(0)
                 .getJSONObject("message")
                 .getString("content")
 
-        return content.trim()
+        // ---------- Strip Markdown code fences ----------
+        if (content.startsWith("```")) {
+
+            // Remove opening ```json or ```
+            content = content
+                .removePrefix("```json")
+                .removePrefix("```")
+                .trim()
+
+            // Remove closing ```
+            if (content.endsWith("```")) {
+                content = content.removeSuffix("```").trim()
+            }
+        }
+
+        // ---------- Extract first JSON block (safety) ----------
+        val firstBrace = content.indexOf("{")
+        val lastBrace = content.lastIndexOf("}")
+
+        if (firstBrace != -1 && lastBrace != -1 && lastBrace > firstBrace) {
+            content = content.substring(firstBrace, lastBrace + 1)
+        }
+
+        return content
     }
 
     private fun executeCommand(command: JSONObject, onResult: (String) -> Unit) {
-        val tStart = System.currentTimeMillis()
-        
-        // [T7] Service Bind Wait
-        if (!isBound || commandGateway == null) {
-            Log.w("executeCommand", "Service disconnected, attempting rebind...")
-            try {
-                bindService(gatewayIntent, serviceConnection, BIND_AUTO_CREATE)
-            } catch (e: Exception) {
-                Log.e("executeCommand", "Rebind failed", e)
+        val pkg = command.getString("package")
+        val serviceClass = command.getString("service")
+        val commandJsonStr = command.getJSONObject("commandJson").toString()
+
+        val key = "$pkg|$serviceClass"
+
+        val bound = gatewayMap.getOrPut(key) {
+            // Create a new binding entry + connection for this target service
+            val conn = object : ServiceConnection {
+                override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                    val entry = gatewayMap[key] ?: return
+                    entry.gateway = ICommandGateway.Stub.asInterface(service)
+                    entry.isBound = true
+
+                    Log.d("executeCommand", "Connected: $key")
+
+                    // If there was a pending invoke, run it now
+                    val pendingJson = entry.pendingCommandJson
+                    val cb = entry.pendingResult
+                    entry.pendingCommandJson = null
+                    entry.pendingResult = null
+
+                    if (pendingJson != null && cb != null) {
+                        invokeGateway(entry, pendingJson, cb)
+                    }
+                }
+
+                override fun onServiceDisconnected(name: ComponentName?) {
+                    val entry = gatewayMap[key] ?: return
+                    entry.gateway = null
+                    entry.isBound = false
+                    Log.d("executeCommand", "Disconnected: $key")
+                }
             }
 
-            // Simple blocking wait since we are on a background thread (Dispatchers.IO)
-            for (i in 0 until 5) {
-                try {
-                    Thread.sleep(500)
-                } catch (e: InterruptedException) {
-                    e.printStackTrace()
-                }
-                if (isBound && commandGateway != null) {
-                    Log.d("executeCommand", "Service reconnected successfully")
-                    break
-                }
-            }
+            BoundGateway(
+                pkg = pkg,
+                serviceClass = serviceClass,
+                connection = conn
+            )
         }
-        val tAfterBind = System.currentTimeMillis()
-        Log.d("LatencyTest", "[T7] Service Bind Wait: ${tAfterBind - tStart}ms")
 
-        if (!isBound || commandGateway == null) {
-            onResult("Service not connected (rebind failed)")
+        // If already connected, invoke immediately
+        if (bound.isBound && bound.gateway != null) {
+            invokeGateway(bound, commandJsonStr, onResult)
             return
         }
 
+        // Otherwise bind and invoke after connection
+        bound.pendingCommandJson = commandJsonStr
+        bound.pendingResult = onResult
+
+        val intent = Intent().apply {
+            component = ComponentName(pkg, serviceClass)
+        }
+
+        // Optional sanity check
+        val resolved = packageManager.resolveService(intent, 0)
+        if (resolved == null) {
+            bound.pendingCommandJson = null
+            bound.pendingResult = null
+            onResult("Service not found: $pkg / $serviceClass")
+            return
+        }
+
+        val ok = bindService(intent, bound.connection, BIND_AUTO_CREATE)
+        Log.d("executeCommand", "bindService($key) returned: $ok")
+
+        if (!ok) {
+            bound.pendingCommandJson = null
+            bound.pendingResult = null
+            onResult("bindService failed: $pkg / $serviceClass")
+        }
+    }
+
+    private fun invokeGateway(
+        bound: BoundGateway,
+        commandJsonStr: String,
+        onResult: (String) -> Unit
+    ) {
         try {
-            // [T8] IPC Round Trip
-            val tIPCStart = System.currentTimeMillis()
-            val resultJson = commandGateway!!.invoke(command.getJSONObject("commandJson").toString())
-            val tIPCEnd = System.currentTimeMillis()
-            Log.d("LatencyTest", "[T8] IPC Invoke Round Trip: ${tIPCEnd - tIPCStart}ms")
-            
-            val msg = JSONObject(resultJson).optString("message", resultJson)
+            val resultJson = bound.gateway!!.invoke(commandJsonStr)
+            val msg = try {
+                JSONObject(resultJson).optString("message", resultJson)
+            } catch (_: Exception) {
+                resultJson
+            }
             onResult(msg)
         } catch (e: Exception) {
             onResult("Error: ${e.message}")
