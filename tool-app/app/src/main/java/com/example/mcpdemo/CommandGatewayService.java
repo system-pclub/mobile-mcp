@@ -1,12 +1,14 @@
 package com.example.mcpdemo;
 
-import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Looper;
+import android.os.Handler;
+import android.os.Message;
+import android.os.Messenger;
 import android.os.RemoteException;
-import android.os.ResultReceiver;
 import android.util.Log;
 import org.json.JSONObject;
 import org.json.JSONException;
@@ -15,152 +17,103 @@ public class CommandGatewayService extends Service {
 
     private ClockInManager clockInManager;
 
-    // 实现 AIDL 接口
-//    private final ICommandGateway.Stub binder = new ICommandGateway.Stub() {
-//        @Override
-//        public String invoke(String commandJson) throws RemoteException {
-//            Log.d("MCP", "Received command: " + commandJson);
-//            JSONObject response = new JSONObject();
-//
-//            // 判空检查，增加健壮性
-//            if (commandJson == null) {
-//                try {
-//                    response.put("status", "error");
-//                    response.put("message", "commandJson is null");
-//                } catch (JSONException e) {
-//                   // This should not happen
-//                }
-//                return response.toString();
-//            }
-//
-//            try {
-//                // 1. 解析 JSON
-//                JSONObject json = new JSONObject(commandJson);
-//                String capabilityId = json.optString("capability");
-//
-//                // 2. 路由分发
-//                switch (capabilityId) {
-//                    case "clock_in_today":
-//                        // 3. 执行逻辑
-//                        notifyActivityToClick();
-//                        response.put("status", "success");
-//                        response.put("message", "Clock in successfully!");
-//                        break;
-//                    case "query_clock_in":
-//                        response = handleQueryClockIn(json);
-//                        break;
-//                    case "make_up_clock_in":
-//                        response = handleMakeUpClockIn(json);
-//                        break;
-//                    default:
-//                        Log.e("MCP", "Received unknown capability ID: " + capabilityId);
-//                        response.put("status", "error");
-//                        response.put("message", "Unknown capability ID: " + capabilityId);
-//                        break;
-//                }
-//            } catch (Exception e) {
-//                Log.e("MCP", "JSON parsing or execution exception", e);
-//                try {
-//                    response.put("status", "error");
-//                    response.put("message", e.getMessage());
-//                } catch (JSONException jsonException) {
-//                    return "{\"status\":\"error\", \"message\":\"" + e.getMessage() + "\"}";
-//                }
-//            }
-//            return response.toString();
-//        }
-//    };
+    public static final int MSG_INVOKE = 1;
+    public static final int MSG_RESULT = 2;
+
+    private final Messenger messenger = new Messenger(
+            new IncomingHandler(Looper.getMainLooper(), this)
+    );
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
+    public IBinder onBind(Intent intent) {
+        // Bound-service pattern: return Messenger binder (no AIDL)
+        return messenger.getBinder();
+    }
 
-        if (intent == null) {
-            stopSelf(startId);
-            return START_NOT_STICKY;
+    private static class IncomingHandler extends Handler {
+        private final CommandGatewayService service;
+
+        IncomingHandler(Looper looper, CommandGatewayService svc) {
+            super(looper);
+            this.service = svc;
         }
 
-        // 1️⃣ Get MCP command JSON
-        String commandJson = intent.getStringExtra("mcp_command_json");
-        String requestId = intent.getStringExtra("mcp_request_id");
-        PendingIntent callback = intent.getParcelableExtra("mcp_callback");
-
-        if (commandJson == null || requestId == null || callback == null) {
-            Log.e("MCPDemo", "Missing command/requestId/callback");
-            stopSelf(startId);
-            return START_NOT_STICKY;
-        }
-
-        Log.d("MCPDemo", "Received MCP command: " + commandJson);
-
-        String resultJson;
-        // 2️⃣ Execute MCP capability
-
-        JSONObject result = new JSONObject();
-
-        try {
-            // 1. 解析 JSON
-            JSONObject json = new JSONObject(commandJson);
-            String capabilityId = json.optString("capability");
-
-            // 2. 路由分发
-            switch (capabilityId) {
-                case "clock_in_today":
-                    // 3. 执行逻辑
-                    notifyActivityToClick();
-                    result.put("status", "success");
-                    result.put("message", "Clock in successfully!");
-                    break;
-                case "query_clock_in":
-                    result = handleQueryClockIn(json);
-                    break;
-                case "make_up_clock_in":
-                    result = handleMakeUpClockIn(json);
-                    break;
-                default:
-                    Log.e("MCP", "Received unknown capability ID: " + capabilityId);
-                    result.put("status", "error");
-                    result.put("message", "Unknown capability ID: " + capabilityId);
-                    break;
+        @Override
+        public void handleMessage(Message msg) {
+            if (msg.what != MSG_INVOKE) {
+                super.handleMessage(msg);
+                return;
             }
-            resultJson = result.toString();
-        } catch (Exception e) {
-            Log.e("MCP", "JSON parsing or execution exception", e);
+
+            Bundle data = msg.getData();
+            if (data == null) return;
+
+            String commandJson = data.getString("mcp_command_json", "");
+            String requestId = data.getString("mcp_request_id", "");
+
+            Log.d("MCPDemo", "Received MCP command: " + commandJson);
+            String resultJson;
+            JSONObject result = new JSONObject();
+
             try {
-                result.put("status", "error");
-                result.put("message", e.getMessage());
+                // 1. 解析 JSON
+                JSONObject json = new JSONObject(commandJson);
+                String capabilityId = json.optString("capability");
+
+                // 2. 路由分发
+                switch (capabilityId) {
+                    case "clock_in_today":
+                        // 3. 执行逻辑
+                        service.notifyActivityToClick();
+                        result.put("status", "success");
+                        result.put("message", "Clock in successfully!");
+                        break;
+                    case "query_clock_in":
+                        result = service.handleQueryClockIn(json);
+                        break;
+                    case "make_up_clock_in":
+                        result = service.handleMakeUpClockIn(json);
+                        break;
+                    default:
+                        Log.e("MCP", "Received unknown capability ID: " + capabilityId);
+                        result.put("status", "error");
+                        result.put("message", "Unknown capability ID: " + capabilityId);
+                        break;
+                }
                 resultJson = result.toString();
-            } catch (JSONException jsonException) {
-                resultJson = "{\"status\":\"error\", \"message\":\"" + e.getMessage() + "\"}";
+            } catch (Exception e) {
+                Log.e("MCP", "JSON parsing or execution exception", e);
+                try {
+                    result.put("status", "error");
+                    result.put("message", e.getMessage());
+                    resultJson = result.toString();
+                } catch (JSONException jsonException) {
+                    resultJson = "{\"status\":\"error\", \"message\":\"" + e.getMessage() + "\"}";
+                }
+            }
+
+            // Reply to the caller via msg.replyTo
+            Messenger replyTo = msg.replyTo;
+            if (replyTo != null) {
+                Message reply = Message.obtain(null, MSG_RESULT);
+                Bundle out = new Bundle();
+                out.putString("mcp_request_id", requestId);
+                out.putString("result_json", resultJson);
+                reply.setData(out);
+
+                try {
+                    replyTo.send(reply);
+                } catch (RemoteException e) {
+                    Log.e("MCPDemo", "Failed to reply", e);
+                }
             }
         }
-
-        // 3️⃣ Send result back to LLM-app
-        Intent back = new Intent();
-        back.putExtra("mcp_request_id", requestId);
-        back.putExtra("result_json", resultJson);
-
-        try {
-            callback.send(this, 0, back);
-        } catch (PendingIntent.CanceledException e) {
-            Log.e("MCPDemo", "Callback canceled", e);
-        }
-        // 4️⃣ Stop service instance
-        stopSelf(startId);
-
-        return START_NOT_STICKY;
     }
 
     @Override
     public void onCreate() {
         super.onCreate();
         clockInManager = new ClockInManager(this);
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        // 当大模型 APP 连接时，返回这个 binder 接口
-//        return binder;
-        return null; // started-service pattern
     }
 
     // 发送广播给 MainActivity

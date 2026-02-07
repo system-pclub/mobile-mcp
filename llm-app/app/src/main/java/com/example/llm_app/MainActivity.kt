@@ -1,10 +1,8 @@
 package com.example.llm_app
 
-import android.app.PendingIntent
 import android.content.*
 import android.content.pm.PackageManager
 import android.content.res.Resources
-import android.os.Build
 import android.os.Bundle
 
 import android.speech.RecognizerIntent
@@ -44,6 +42,11 @@ import java.util.*
 import org.xmlpull.v1.XmlPullParser
 import java.text.SimpleDateFormat
 
+import android.os.*
+
+private const val MSG_INVOKE = 1
+private const val MSG_RESULT = 2
+
 class MainActivity : ComponentActivity() {
 
     data class ChatMessage(
@@ -65,6 +68,35 @@ class MainActivity : ComponentActivity() {
 
     val mcpAppMap: MutableMap<String, McpAppInfo> = mutableMapOf()
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    // requestId -> callback
+    private val pendingCallbacks = mutableMapOf<String, (String) -> Unit>()
+
+    // This Messenger receives replies from tool apps
+    private val replyMessenger = Messenger(object : Handler(Looper.getMainLooper()) {
+        override fun handleMessage(msg: Message) {
+            if (msg.what != MSG_RESULT) return
+
+            val data = msg.data ?: return
+            val requestId = data.getString("mcp_request_id") ?: return
+            val resultJson = data.getString("result_json").orEmpty()
+
+            val cb = pendingCallbacks.remove(requestId)
+            cb?.invoke(resultJson)
+        }
+    })
+
+    private data class ToolConn(
+        val pkg: String,
+        val serviceClass: String,
+        var messenger: Messenger? = null,
+        var isBound: Boolean = false,
+        val conn: ServiceConnection
+    )
+
+    private val toolMap = mutableMapOf<String, ToolConn>() // key = "$pkg|$service"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -75,6 +107,24 @@ class MainActivity : ComponentActivity() {
         setContent {
             VoiceToCommandScreen()
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+
+        // 🔹 Unbind all MCP tool services
+        toolMap.values.forEach { tool ->
+            if (tool.isBound) {
+                try {
+                    unbindService(tool.conn)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        toolMap.clear()
+        pendingCallbacks.clear()
     }
 
     private fun retrieveMcpCapabilities() {
@@ -437,43 +487,61 @@ class MainActivity : ComponentActivity() {
         val serviceClass = command.getString("service")
         val commandJsonStr = command.getJSONObject("commandJson").toString()
 
-        val requestId = UUID.randomUUID().toString()
+        val key = "$pkg|$serviceClass"
 
-        // Register callback
-        McpResultBus.register(requestId) { resultJson ->
-            val msg = try {
-                Log.d("executeCommand", "resultJson: $resultJson")
-                JSONObject(resultJson).optString("message", resultJson)
-            } catch (_: Exception) {
-                resultJson
+        val tool = toolMap.getOrPut(key) {
+            val sc = object : ServiceConnection {
+                override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                    val entry = toolMap[key] ?: return
+                    entry.messenger = Messenger(service)
+                    entry.isBound = true
+                }
+
+                override fun onServiceDisconnected(name: ComponentName?) {
+                    val entry = toolMap[key] ?: return
+                    entry.messenger = null
+                    entry.isBound = false
+                }
             }
-            onResult(msg)
+            ToolConn(pkg, serviceClass, conn = sc)
         }
 
-        // PendingIntent that targets our receiver
-        val callbackIntent = Intent(this, McpResultReceiver::class.java).apply {
-            putExtra("mcp_request_id", requestId)
+        fun sendNow() {
+            val requestId = UUID.randomUUID().toString()
+            pendingCallbacks[requestId] = { resultJson ->
+                // Extract "message" for UI
+                val msgText = try {
+                    Log.d("executeCommand", "resultJson: $resultJson")
+                    JSONObject(resultJson).optString("message", resultJson)
+                } catch (_: Exception) {
+                    resultJson
+                }
+                onResult(msgText)
+            }
+
+            val m = Message.obtain(null, MSG_INVOKE)
+            m.replyTo = replyMessenger
+            m.data = Bundle().apply {
+                putString("mcp_request_id", requestId)
+                putString("mcp_command_json", commandJsonStr)
+            }
+
+            try {
+                tool.messenger?.send(m)
+            } catch (e: Exception) {
+                pendingCallbacks.remove(requestId)
+                onResult("Error sending to tool: ${e.message}")
+            }
         }
 
-        val flags = when {
-            Build.VERSION.SDK_INT >= 31 ->
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-            else ->
-                PendingIntent.FLAG_UPDATE_CURRENT
+        if (tool.isBound && tool.messenger != null) {
+            sendNow()
+            return
         }
 
-        val pending = PendingIntent.getBroadcast(
-            this,
-            requestId.hashCode(),
-            callbackIntent,
-            flags
-        )
-
+        // Bind first, then send
         val intent = Intent().apply {
             component = ComponentName(pkg, serviceClass)
-            putExtra("mcp_command_json", commandJsonStr)
-            putExtra("mcp_request_id", requestId)
-            putExtra("mcp_callback", pending)
         }
 
         val resolved = packageManager.resolveService(intent, 0)
@@ -482,9 +550,30 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        startService(intent)
-    }
+        val ok = bindService(intent, tool.conn, BIND_AUTO_CREATE)
+        if (!ok) {
+            onResult("bindService failed: $pkg / $serviceClass")
+            return
+        }
 
+        // Wait until bound, then send (poll a few times quickly)
+        var tries = 0
+        val r = object : Runnable {
+            override fun run() {
+                if (tool.isBound && tool.messenger != null) {
+                    sendNow()
+                    return
+                }
+                tries++
+                if (tries >= 20) { // ~2s max
+                    onResult("Timeout binding to tool service")
+                    return
+                }
+                mainHandler.postDelayed(this, 100)
+            }
+        }
+        mainHandler.post(r)
+    }
 
     /* ===================== Compose UI ===================== */
     @Composable
