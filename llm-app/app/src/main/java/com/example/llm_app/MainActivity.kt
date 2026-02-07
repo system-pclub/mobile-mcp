@@ -1,11 +1,11 @@
 package com.example.llm_app
 
+import android.app.PendingIntent
 import android.content.*
 import android.content.pm.PackageManager
 import android.content.res.Resources
+import android.os.Build
 import android.os.Bundle
-import android.os.IBinder
-import android.os.Handler
 
 import android.speech.RecognizerIntent
 import android.util.Log
@@ -41,7 +41,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.*
 
-import com.example.mcpdemo.ICommandGateway
 import org.xmlpull.v1.XmlPullParser
 import java.text.SimpleDateFormat
 
@@ -65,18 +64,6 @@ class MainActivity : ComponentActivity() {
     )
 
     val mcpAppMap: MutableMap<String, McpAppInfo> = mutableMapOf()
-
-    private data class BoundGateway(
-        val pkg: String,
-        val serviceClass: String,
-        var gateway: ICommandGateway? = null,
-        var isBound: Boolean = false,
-        var pendingCommandJson: String? = null,
-        var pendingResult: ((String) -> Unit)? = null,
-        val connection: ServiceConnection
-    )
-
-    private val gatewayMap = mutableMapOf<String, BoundGateway>() // key = "$pkg|$service"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -450,94 +437,54 @@ class MainActivity : ComponentActivity() {
         val serviceClass = command.getString("service")
         val commandJsonStr = command.getJSONObject("commandJson").toString()
 
-        val key = "$pkg|$serviceClass"
+        val requestId = UUID.randomUUID().toString()
 
-        val bound = gatewayMap.getOrPut(key) {
-            // Create a new binding entry + connection for this target service
-            val conn = object : ServiceConnection {
-                override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                    val entry = gatewayMap[key] ?: return
-                    entry.gateway = ICommandGateway.Stub.asInterface(service)
-                    entry.isBound = true
-
-                    Log.d("executeCommand", "Connected: $key")
-
-                    // If there was a pending invoke, run it now
-                    val pendingJson = entry.pendingCommandJson
-                    val cb = entry.pendingResult
-                    entry.pendingCommandJson = null
-                    entry.pendingResult = null
-
-                    if (pendingJson != null && cb != null) {
-                        invokeGateway(entry, pendingJson, cb)
-                    }
-                }
-
-                override fun onServiceDisconnected(name: ComponentName?) {
-                    val entry = gatewayMap[key] ?: return
-                    entry.gateway = null
-                    entry.isBound = false
-                    Log.d("executeCommand", "Disconnected: $key")
-                }
-            }
-
-            BoundGateway(
-                pkg = pkg,
-                serviceClass = serviceClass,
-                connection = conn
-            )
-        }
-
-        // If already connected, invoke immediately
-        if (bound.isBound && bound.gateway != null) {
-            invokeGateway(bound, commandJsonStr, onResult)
-            return
-        }
-
-        // Otherwise bind and invoke after connection
-        bound.pendingCommandJson = commandJsonStr
-        bound.pendingResult = onResult
-
-        val intent = Intent().apply {
-            component = ComponentName(pkg, serviceClass)
-        }
-
-        // Optional sanity check
-        val resolved = packageManager.resolveService(intent, 0)
-        if (resolved == null) {
-            bound.pendingCommandJson = null
-            bound.pendingResult = null
-            onResult("Service not found: $pkg / $serviceClass")
-            return
-        }
-
-        val ok = bindService(intent, bound.connection, BIND_AUTO_CREATE)
-        Log.d("executeCommand", "bindService($key) returned: $ok")
-
-        if (!ok) {
-            bound.pendingCommandJson = null
-            bound.pendingResult = null
-            onResult("bindService failed: $pkg / $serviceClass")
-        }
-    }
-
-    private fun invokeGateway(
-        bound: BoundGateway,
-        commandJsonStr: String,
-        onResult: (String) -> Unit
-    ) {
-        try {
-            val resultJson = bound.gateway!!.invoke(commandJsonStr)
+        // Register callback
+        McpResultBus.register(requestId) { resultJson ->
             val msg = try {
+                Log.d("executeCommand", "resultJson: $resultJson")
                 JSONObject(resultJson).optString("message", resultJson)
             } catch (_: Exception) {
                 resultJson
             }
             onResult(msg)
-        } catch (e: Exception) {
-            onResult("Error: ${e.message}")
         }
+
+        // PendingIntent that targets our receiver
+        val callbackIntent = Intent(this, McpResultReceiver::class.java).apply {
+            putExtra("mcp_request_id", requestId)
+        }
+
+        val flags = when {
+            Build.VERSION.SDK_INT >= 31 ->
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            else ->
+                PendingIntent.FLAG_UPDATE_CURRENT
+        }
+
+        val pending = PendingIntent.getBroadcast(
+            this,
+            requestId.hashCode(),
+            callbackIntent,
+            flags
+        )
+
+        val intent = Intent().apply {
+            component = ComponentName(pkg, serviceClass)
+            putExtra("mcp_command_json", commandJsonStr)
+            putExtra("mcp_request_id", requestId)
+            putExtra("mcp_callback", pending)
+        }
+
+        val resolved = packageManager.resolveService(intent, 0)
+        if (resolved == null) {
+            onResult("Service not found: $pkg / $serviceClass")
+            return
+        }
+
+        startService(intent)
     }
+
 
     /* ===================== Compose UI ===================== */
     @Composable
