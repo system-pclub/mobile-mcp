@@ -22,14 +22,14 @@
             </intent-filter>
         </activity>
 
-        <!-- 注册对外服务的 Service -->
+        <!-- Register externally exposed service -->
         <service
             android:name=".CommandGatewayService"
             android:enabled="true"
             android:exported="true"
             tools:ignore="ExportedService">
 
-            <!-- 应用级别的元数据 -->
+            <!-- App-level metadata -->
             <meta-data
                 android:name="mcp.application.name"
                 android:value="Daily Clock-in" />
@@ -37,7 +37,7 @@
                 android:name="mcp.application.description"
                 android:value="@string/app_desc" />
 
-            <!-- 工具级别的元数据 -->
+            <!-- Tool-level metadata -->
             <meta-data
                 android:name="mcp.capabilities"
                 android:resource="@xml/mcp_capabilities" />

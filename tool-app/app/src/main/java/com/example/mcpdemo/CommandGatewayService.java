@@ -173,7 +173,7 @@ public class CommandGatewayService extends Service {
     // broadcast to MainActivity
     private void notifyActivityToClick() {
         Intent intent = new Intent("ACTION_AI_CLICK");
-        // 限制广播只发给自己，符合 Android 安全规范
+        // Restrict broadcast to this app for Android security compliance
         intent.setPackage(getPackageName());
         sendBroadcast(intent);
     }
@@ -256,7 +256,7 @@ public class CommandGatewayService extends Service {
 
         Log.d("MCP", "Make up clock-in for " + date);
 
-        // 发送广播通知 UI 更新
+        // Send broadcast to notify UI refresh
         long m3StartNs = SystemClock.elapsedRealtimeNanos();
         Intent intent = new Intent("ACTION_MAKE_UP_CLOCK_IN_SUCCESS");
         intent.putExtra("date", date);
