@@ -2,14 +2,29 @@ package com.example.llm_app
 
 import java.util.concurrent.ConcurrentHashMap
 
-object McpResultBus {
-    private val callbacks = ConcurrentHashMap<String, (String) -> Unit>()
+data class McpCallbackPayload(
+    val requestId: String,
+    val resultJson: String,
+    val receiveNs: Long,
+    val serviceS0Ns: Long,
+    val serviceS1StartNs: Long,
+    val serviceS1EndNs: Long,
+    val serviceS2StartNs: Long,
+    val serviceS2EndNs: Long,
+    val serviceS3aNs: Long,
+    val serviceS3bNs: Long,
+    val capability: String,
+    val runIndex: Int
+)
 
-    fun register(requestId: String, cb: (String) -> Unit) {
+object McpResultBus {
+    private val callbacks = ConcurrentHashMap<String, (McpCallbackPayload) -> Unit>()
+
+    fun register(requestId: String, cb: (McpCallbackPayload) -> Unit) {
         callbacks[requestId] = cb
     }
 
-    fun deliver(requestId: String, resultJson: String) {
-        callbacks.remove(requestId)?.invoke(resultJson)
+    fun deliver(payload: McpCallbackPayload) {
+        callbacks.remove(payload.requestId)?.invoke(payload)
     }
 }
