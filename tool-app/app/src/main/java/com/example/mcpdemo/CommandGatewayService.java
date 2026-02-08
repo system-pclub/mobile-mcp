@@ -56,14 +56,14 @@ public class CommandGatewayService extends Service {
             JSONObject result = new JSONObject();
 
             try {
-                // 1. 解析 JSON
+                // 1. Parse JSON
                 JSONObject json = new JSONObject(commandJson);
                 String capabilityId = json.optString("capability");
 
-                // 2. 路由分发
+                // 2. Route by capability
                 switch (capabilityId) {
                     case "clock_in_today":
-                        // 3. 执行逻辑
+                        // 3. Execute business logic
                         service.notifyActivityToClick();
                         result.put("status", "success");
                         result.put("message", "Clock in successfully!");
@@ -116,10 +116,10 @@ public class CommandGatewayService extends Service {
         clockInManager = new ClockInManager(this);
     }
 
-    // 发送广播给 MainActivity
+    // Send broadcast to MainActivity
     private void notifyActivityToClick() {
         Intent intent = new Intent("ACTION_AI_CLICK");
-        // 限制广播只发给自己，符合 Android 安全规范
+        // Restrict broadcast to this app for Android security compliance
         intent.setPackage(getPackageName());
         sendBroadcast(intent);
     }
@@ -160,7 +160,7 @@ public class CommandGatewayService extends Service {
 
         Log.d("MCP", "Make up clock-in for " + date);
 
-        // 发送广播通知 UI 更新
+        // Send broadcast to notify UI refresh
         Intent intent = new Intent("ACTION_MAKE_UP_CLOCK_IN_SUCCESS");
         intent.putExtra("date", date);
         intent.setPackage(getPackageName());

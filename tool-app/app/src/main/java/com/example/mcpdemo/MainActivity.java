@@ -35,7 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private SimpleDateFormat dayFormat;
     private SimpleDateFormat logTimeFormat;
 
-    // 广播接收器：听到 Service 喊话就执行（用于AI远程触发）
+    // Broadcast receiver: handles service signals (used for AI remote triggers)
     private final BroadcastReceiver aiCommandReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -58,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // 初始化组件
+        // Initialize UI components
         myButton = findViewById(R.id.btn_action);
         tvStatus = findViewById(R.id.tv_status);
         tvConsecutive = findViewById(R.id.tv_consecutive);
@@ -68,20 +68,20 @@ public class MainActivity extends AppCompatActivity {
         Button btnPrevMonth = findViewById(R.id.btn_prev_month);
         Button btnNextMonth = findViewById(R.id.btn_next_month);
 
-        // 初始化打卡管理器
+        // Initialize clock-in manager
         clockInManager = new ClockInManager(this);
-        // 每次启动时重置数据
+        // Reset data on each startup
         clockInManager.resetClockInData();
 
-        // 初始化日期格式化
+        // Initialize date formatters
         monthFormat = new SimpleDateFormat("MMM yyyy", Locale.getDefault());
         dayFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         logTimeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
 
-        // 初始化日历
+        // Initialize calendar
         currentCalendar = Calendar.getInstance();
 
-        // 设置打卡按钮点击逻辑
+        // Set clock-in button click behavior
         myButton.setOnClickListener(v -> {
             if (clockInManager.hasClockedInToday()) {
                 addLog("Already clocked in today");
@@ -94,24 +94,24 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 上一月按钮
+        // Previous month button
         btnPrevMonth.setOnClickListener(v -> {
             currentCalendar.add(Calendar.MONTH, -1);
             refreshCalendar();
         });
 
-        // 下一月按钮
+        // Next month button
         btnNextMonth.setOnClickListener(v -> {
             currentCalendar.add(Calendar.MONTH, 1);
             refreshCalendar();
         });
 
-        // 初始化显示
+        // Initialize display
         updateClockInStatus();
         refreshCalendar();
         addLog("Application started");
 
-        // 注册AI指令广播
+        // Register AI command broadcasts
         IntentFilter filter = new IntentFilter();
         filter.addAction("ACTION_AI_CLICK");
         filter.addAction("ACTION_MAKE_UP_CLOCK_IN_SUCCESS");
@@ -119,7 +119,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 添加日志条目
+     * Add a log entry
      */
     private void addLog(String message) {
         String currentTime = logTimeFormat.format(new Date());
@@ -128,7 +128,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 更新打卡状态显示
+     * Update clock-in status display
      */
     private void updateClockInStatus() {
         if (clockInManager.hasClockedInToday()) {
@@ -144,7 +144,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 刷新日历显示
+     * Refresh calendar display
      */
     private void refreshCalendar() {
         tvMonthTitle.setText(monthFormat.format(currentCalendar.getTime()));
@@ -172,7 +172,7 @@ public class MainActivity extends AppCompatActivity {
 
             TextView dayView = createDayView(String.valueOf(day), isClockedIn, isToday, isPast);
 
-            // 只为过去的、未打卡日期设置长按补卡
+            // Only enable long-press make-up clock-in for past unclocked dates
             if (isPast && !isClockedIn) {
                 final int finalDay = day;
                 dayView.setOnLongClickListener(v -> {
@@ -185,7 +185,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 创建日期视图，并根据状态美化
+     * Create a day view and style it based on status
      */
     private TextView createDayView(String day, boolean isClockedIn, boolean isToday, boolean isPast) {
         TextView textView = new TextView(this);
@@ -239,7 +239,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 显示补卡对话框
+     * Show make-up clock-in dialog
      */
     private void showMakeUpClockInDialog(int year, int month, int day) {
         Calendar cal = Calendar.getInstance();
