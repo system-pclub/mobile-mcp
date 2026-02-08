@@ -3,74 +3,16 @@ package com.example.mcpdemo;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
-import android.os.Bundle;
 import android.os.IBinder;
-import android.os.RemoteException;
-import android.os.ResultReceiver;
 import android.os.SystemClock;
 import android.util.Log;
+
 import org.json.JSONObject;
 import org.json.JSONException;
 
 public class CommandGatewayService extends Service {
 
     private ClockInManager clockInManager;
-
-    // 实现 AIDL 接口
-//    private final ICommandGateway.Stub binder = new ICommandGateway.Stub() {
-//        @Override
-//        public String invoke(String commandJson) throws RemoteException {
-//            Log.d("MCP", "Received command: " + commandJson);
-//            JSONObject response = new JSONObject();
-//
-//            // 判空检查，增加健壮性
-//            if (commandJson == null) {
-//                try {
-//                    response.put("status", "error");
-//                    response.put("message", "commandJson is null");
-//                } catch (JSONException e) {
-//                   // This should not happen
-//                }
-//                return response.toString();
-//            }
-//
-//            try {
-//                // 1. 解析 JSON
-//                JSONObject json = new JSONObject(commandJson);
-//                String capabilityId = json.optString("capability");
-//
-//                // 2. 路由分发
-//                switch (capabilityId) {
-//                    case "clock_in_today":
-//                        // 3. 执行逻辑
-//                        notifyActivityToClick();
-//                        response.put("status", "success");
-//                        response.put("message", "Clock in successfully!");
-//                        break;
-//                    case "query_clock_in":
-//                        response = handleQueryClockIn(json);
-//                        break;
-//                    case "make_up_clock_in":
-//                        response = handleMakeUpClockIn(json);
-//                        break;
-//                    default:
-//                        Log.e("MCP", "Received unknown capability ID: " + capabilityId);
-//                        response.put("status", "error");
-//                        response.put("message", "Unknown capability ID: " + capabilityId);
-//                        break;
-//                }
-//            } catch (Exception e) {
-//                Log.e("MCP", "JSON parsing or execution exception", e);
-//                try {
-//                    response.put("status", "error");
-//                    response.put("message", e.getMessage());
-//                } catch (JSONException jsonException) {
-//                    return "{\"status\":\"error\", \"message\":\"" + e.getMessage() + "\"}";
-//                }
-//            }
-//            return response.toString();
-//        }
-//    };
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -225,12 +167,10 @@ public class CommandGatewayService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        // 当大模型 APP 连接时，返回这个 binder 接口
-//        return binder;
-        return null; // started-service pattern
+        return null;
     }
 
-    // 发送广播给 MainActivity
+    // broadcast to MainActivity
     private void notifyActivityToClick() {
         Intent intent = new Intent("ACTION_AI_CLICK");
         // 限制广播只发给自己，符合 Android 安全规范
@@ -239,7 +179,7 @@ public class CommandGatewayService extends Service {
     }
 
     /**
-     * 处理查询打卡命令
+     * handle query_clock_in
      *
      * @return JSONObject containing the result
      */
@@ -288,7 +228,7 @@ public class CommandGatewayService extends Service {
     }
 
     /**
-     * 处理补卡命令
+     * handle make_up_clock_in
      *
      * @return JSONObject containing the result
      */

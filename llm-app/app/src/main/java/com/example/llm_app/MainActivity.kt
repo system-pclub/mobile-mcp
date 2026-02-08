@@ -238,14 +238,16 @@ class MainActivity : ComponentActivity() {
 
                     // Read attributes
                     for (i in 0 until parser.attributeCount) {
-                        sb.append(" ${parser.getAttributeName(i)}=\"${parser.getAttributeValue(i)}\"" )
+                        sb.append(" ${parser.getAttributeName(i)}=\"${parser.getAttributeValue(i)}\"")
                     }
 
                     sb.append(">")
                 }
+
                 XmlPullParser.TEXT -> {
                     sb.append(parser.text)
                 }
+
                 XmlPullParser.END_TAG -> {
                     sb.append("</${parser.name}>")
                 }
@@ -290,7 +292,10 @@ class MainActivity : ComponentActivity() {
             callOpenAIAndExecute(
                 recognizedText = case.recognizedText,
                 onStatusUpdate = { status ->
-                    Log.d("LatencyTrace", "benchmark_status capability=${case.capability} run=${case.runIndex} status=$status")
+                    Log.d(
+                        "LatencyTrace",
+                        "benchmark_status capability=${case.capability} run=${case.runIndex} status=$status"
+                    )
                 },
                 traceContext = traceContext,
                 onFinished = { result ->
@@ -377,7 +382,8 @@ class MainActivity : ComponentActivity() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val apiKey = assets.open("openai_key.txt").bufferedReader().use { it.readText().trim() }
+                val apiKey =
+                    assets.open("openai_key.txt").bufferedReader().use { it.readText().trim() }
 
                 val t1Start = SystemClock.elapsedRealtimeNanos()
                 val appList = JSONArray()
@@ -423,7 +429,15 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 val t1End = SystemClock.elapsedRealtimeNanos()
-                LatencyTraceLogger.logSpan(this@MainActivity, requestId, capability, runIndex, "T1", t1Start, t1End)
+                LatencyTraceLogger.logSpan(
+                    this@MainActivity,
+                    requestId,
+                    capability,
+                    runIndex,
+                    "T1",
+                    t1Start,
+                    t1End
+                )
 
                 val t2Start = SystemClock.elapsedRealtimeNanos()
                 val appSelectResult = callOpenAI(apiKey, appSelectPrompt)
@@ -451,7 +465,15 @@ class MainActivity : ComponentActivity() {
                 val selectedApp = mcpAppMap[selectedPackage]
                     ?: throw IllegalStateException("Package not found: $selectedPackage")
                 val t3End = SystemClock.elapsedRealtimeNanos()
-                LatencyTraceLogger.logSpan(this@MainActivity, requestId, capability, runIndex, "T3", t3Start, t3End)
+                LatencyTraceLogger.logSpan(
+                    this@MainActivity,
+                    requestId,
+                    capability,
+                    runIndex,
+                    "T3",
+                    t3Start,
+                    t3End
+                )
 
                 onStatusUpdate("Select target app: ${selectedApp.appName} (${selectedApp.appDescription})")
 
@@ -505,7 +527,15 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 val t4End = SystemClock.elapsedRealtimeNanos()
-                LatencyTraceLogger.logSpan(this@MainActivity, requestId, capability, runIndex, "T4", t4Start, t4End)
+                LatencyTraceLogger.logSpan(
+                    this@MainActivity,
+                    requestId,
+                    capability,
+                    runIndex,
+                    "T4",
+                    t4Start,
+                    t4End
+                )
 
                 val t5Start = SystemClock.elapsedRealtimeNanos()
                 val commandResult = callOpenAI(apiKey, capabilityPrompt)
@@ -547,7 +577,15 @@ class MainActivity : ComponentActivity() {
                     put("commandJson", commandJson)
                 }
                 val t6End = SystemClock.elapsedRealtimeNanos()
-                LatencyTraceLogger.logSpan(this@MainActivity, requestId, capability, runIndex, "T6", t6Start, t6End)
+                LatencyTraceLogger.logSpan(
+                    this@MainActivity,
+                    requestId,
+                    capability,
+                    runIndex,
+                    "T6",
+                    t6Start,
+                    t6End
+                )
 
                 onStatusUpdate("Executing command: $capability")
                 executeCommand(
@@ -558,7 +596,14 @@ class MainActivity : ComponentActivity() {
                 ) { result, payload, t7bNs ->
                     if (payload != null) {
                         if (payload.serviceS0Ns > 0) {
-                            LatencyTraceLogger.logMark(this@MainActivity, requestId, capability, runIndex, "S0", payload.serviceS0Ns)
+                            LatencyTraceLogger.logMark(
+                                this@MainActivity,
+                                requestId,
+                                capability,
+                                runIndex,
+                                "S0",
+                                payload.serviceS0Ns
+                            )
                         }
                         if (payload.serviceS1StartNs > 0 && payload.serviceS1EndNs > 0) {
                             LatencyTraceLogger.logSpan(
@@ -594,15 +639,39 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         if (t7bNs > 0 && payload.serviceS0Ns > 0) {
-                            LatencyTraceLogger.logSpan(this@MainActivity, requestId, capability, runIndex, "T7", t7bNs, payload.serviceS0Ns)
+                            LatencyTraceLogger.logSpan(
+                                this@MainActivity,
+                                requestId,
+                                capability,
+                                runIndex,
+                                "T7",
+                                t7bNs,
+                                payload.serviceS0Ns
+                            )
                         }
                         if (payload.serviceS3bNs > 0 && payload.receiveNs > 0) {
-                            LatencyTraceLogger.logSpan(this@MainActivity, requestId, capability, runIndex, "T8", payload.serviceS3bNs, payload.receiveNs)
+                            LatencyTraceLogger.logSpan(
+                                this@MainActivity,
+                                requestId,
+                                capability,
+                                runIndex,
+                                "T8",
+                                payload.serviceS3bNs,
+                                payload.receiveNs
+                            )
                         }
                     }
 
                     val t9Ns = SystemClock.elapsedRealtimeNanos()
-                    LatencyTraceLogger.logSpan(this@MainActivity, requestId, capability, runIndex, "T9", overallStartNs, t9Ns)
+                    LatencyTraceLogger.logSpan(
+                        this@MainActivity,
+                        requestId,
+                        capability,
+                        runIndex,
+                        "T9",
+                        overallStartNs,
+                        t9Ns
+                    )
                     runOnUiThread {
                         onStatusUpdate("result: $result")
                     }
@@ -632,12 +701,13 @@ class MainActivity : ComponentActivity() {
         val promptChars = promptRaw.length
         val promptBytes = promptRaw.toByteArray(Charsets.UTF_8).size
 
-        val conn = (URL("https://api.openai.com/v1/chat/completions").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Authorization", "Bearer $apiKey")
-            doOutput = true
-        }
+        val conn =
+            (URL("https://api.openai.com/v1/chat/completions").openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Authorization", "Bearer $apiKey")
+                doOutput = true
+            }
 
         conn.outputStream.use {
             it.write(promptRaw.toByteArray(Charsets.UTF_8))
@@ -804,14 +874,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Status
-//            Text(
-//                text = status,
-//                style = MaterialTheme.typography.bodySmall,
-//                color = Color.Gray
-//            )
-
-            // Input row (like ChatGPT)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
