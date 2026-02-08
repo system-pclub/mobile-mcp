@@ -320,59 +320,59 @@ for cap in caps:
     sample_counts.append(len(vals.get((cap, "T9"), [])))
 
 if sample_counts and len(set(sample_counts)) == 1:
-    sample_text = f"每功能{sample_counts[0]}次"
+    sample_text = f"{sample_counts[0]} runs per capability"
 else:
-    sample_text = "不一致: " + ", ".join(f"{caps[i]}={sample_counts[i]}" for i in range(len(caps)))
+    sample_text = "inconsistent: " + ", ".join(f"{caps[i]}={sample_counts[i]}" for i in range(len(caps)))
 
 lines = []
-lines.append("字母缩写说明")
-lines.append("- T = LLM-app 侧链路步骤（端到端）")
-lines.append("- S = Tool-app Service 侧步骤（服务内部）")
-lines.append("- D = Discovery 阶段步骤（启动时扫描MCP信息）")
-lines.append("- T1: App选择 Prompt 构建")
-lines.append("- T2: 第1次 LLM 网络调用")
-lines.append("- T3: App选择结果解析")
-lines.append("- T4: Capability Prompt 构建")
-lines.append("- T5: 第2次 LLM 网络调用")
-lines.append("- T6: 命令 JSON 重组")
-lines.append("- T7a: startService 调用前")
-lines.append("- T7b: startService 调用后")
-lines.append("- T7: Service 拉起/调度延迟（S0 - T7b）")
-lines.append("- T8a: llm-app Receiver 收到回调入口")
-lines.append("- T8: 回调投递延迟（T8a - S3b）")
-lines.append("- T9: 端到端总耗时（从T0到最终结果）")
-lines.append("- S0: onStartCommand 进入")
-lines.append("- S1: 服务端 JSON 解析")
-lines.append("- S2: 服务端 capability 执行")
-lines.append("- S3a: callback.send 调用前")
-lines.append("- S3b: callback.send 调用后")
-lines.append("- S3: callback.send 自身耗时（S3b - S3a）")
-lines.append("- D1: discovery耗时（扫描全部MCP service和app信息）")
+lines.append("Abbreviation Meanings")
+lines.append("- T = LLM-app side pipeline steps (end-to-end)")
+lines.append("- S = Tool-app Service side steps (inside service)")
+lines.append("- D = Discovery phase steps (scan MCP info at startup)")
+lines.append("- T1: App-selection prompt construction")
+lines.append("- T2: First LLM network call")
+lines.append("- T3: App-selection result parsing")
+lines.append("- T4: Capability prompt construction")
+lines.append("- T5: Second LLM network call")
+lines.append("- T6: Command JSON reassembly")
+lines.append("- T7a: Before startService call")
+lines.append("- T7b: After startService call")
+lines.append("- T7: Service launch/scheduling delay (S0 - T7b)")
+lines.append("- T8a: llm-app Receiver callback entry")
+lines.append("- T8: Callback delivery delay (T8a - S3b)")
+lines.append("- T9: End-to-end total duration (T0 to final result)")
+lines.append("- S0: onStartCommand entry")
+lines.append("- S1: Service-side JSON parsing")
+lines.append("- S2: Service-side capability execution")
+lines.append("- S3a: Before callback.send")
+lines.append("- S3b: After callback.send")
+lines.append("- S3: callback.send self cost (S3b - S3a)")
+lines.append("- D1: Discovery cost (scan all MCP services and apps)")
 lines.append("")
-lines.append("脚本测试汇总（run_latency_benchmark.sh）")
-lines.append(f"输出目录: {out_dir}")
-lines.append(f"样本量: {sample_text}")
-lines.append(f"D1 discovery耗时(ms): {discovery_ms if discovery_ms is not None else '未捕获'}")
-lines.append(f"D1 discovery是否已记录: {'是' if discovery_ms is not None else '否'}")
+lines.append("Benchmark Summary (run_latency_benchmark.sh)")
+lines.append(f"Output directory: {out_dir}")
+lines.append(f"Sample size: {sample_text}")
+lines.append(f"D1 discovery duration (ms): {discovery_ms if discovery_ms is not None else 'not captured'}")
+lines.append(f"D1 discovery captured: {'yes' if discovery_ms is not None else 'no'}")
 lines.append("")
 
 for cap in caps:
     t9_arr = vals.get((cap, "T9"), [])
     if not t9_arr:
-        lines.append(f"功能: {cap}")
-        lines.append("- 无有效T9数据")
+        lines.append(f"Capability: {cap}")
+        lines.append("- No valid T9 data")
         lines.append("")
         continue
     
     t9 = avg(t9_arr)
     if t9 <= 0:
-        lines.append(f"功能: {cap}")
-        lines.append("- T9平均为0，跳过百分比计算")
+        lines.append(f"Capability: {cap}")
+        lines.append("- T9 average is 0; skipped percentage calculation")
         lines.append("")
         continue
 
-    lines.append(f"功能: {cap}")
-    lines.append(f"- T9平均: {t9:.3f} ms")
+    lines.append(f"Capability: {cap}")
+    lines.append(f"- T9 average: {t9:.3f} ms")
     for st in main_steps:
         arr = vals.get((cap, st), [])
         if not arr:
@@ -380,13 +380,13 @@ for cap in caps:
         st_avg = avg(arr)
         lines.append(f"  - {st}: {st_avg:.3f} ms ({(st_avg / t9) * 100:.2f}%)")
 
-    lines.append("  - S2细粒度:")
+    lines.append("  - S2 granular:")
     for st in granular_order[cap]:
         arr = gran_vals.get((cap, st), [])
         if arr:
             lines.append(f"    * {st}: {avg(arr):.6f} ms")
         else:
-            lines.append(f"    * {st}: 无数据")
+            lines.append(f"    * {st}: no data")
 
     t2_in = avg(pt.get((cap, "T2"), []))
     t2_out = avg(ct.get((cap, "T2"), []))
