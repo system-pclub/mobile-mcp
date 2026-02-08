@@ -68,10 +68,10 @@ cat results/benchmark_summary_granular.txt
 
 ## Contributors
 
-- Xiheng Li - [xhl0724@gmail.com](mailto:xhl0724@gmail.com)
-- Mengting He - [mvh6224@psu.edu](mailto:mvh6224@psu.edu)
-- Chengcheng Wan - [ccwan@sei.ecnu.edu.cn](mailto:ccwan@sei.ecnu.edu.cn)
-- Linhai Song - [songlinhai@ict.ac.cn](mailto:songlinhai@ict.ac.cn)
+- Xiheng Li
+- Mengting He
+- Chengcheng Wan
+- Linhai Song
 
 ## Video Link
 
