@@ -8,8 +8,9 @@
     <string name="today_clocked">Clocked in today</string>
     <string name="today_not_clocked">Not clocked in today</string>
     <string name="consecutive_days">Consecutive clock-ins: %d days</string>
-    <string name="month_calendar">Year %d Month %d</string>
+    <string name="month_calendar">%2$d/%1$d</string>
     <string name="make_up_clock_in">Make up clock-in</string>
     <string name="clocked_in">Clocked in</string>
     <string name="not_clocked_in">Not clocked in</string>
+    <string name="clock_in_record">Clock-in Record:</string>
 </resources>

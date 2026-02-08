@@ -97,7 +97,6 @@ public class ClockInManager {
         return result;
     }
 
-
     /**
      * Get consecutive clock-in days
      */
