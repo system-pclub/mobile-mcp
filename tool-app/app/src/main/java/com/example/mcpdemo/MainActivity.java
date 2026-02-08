@@ -106,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
             refreshCalendar();
         });
 
-        // 初始化显示
+        // Initialize display
         updateClockInStatus();
         refreshCalendar();
         addLog("Application started");
