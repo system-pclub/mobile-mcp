@@ -2,6 +2,7 @@ package com.example.mcpdemo;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -76,24 +77,24 @@ public class ClockInManager {
     /**
      * Get clock-in calendar data for a specific month
      *
-     * @param year Year
+     * @param year  Year
      * @param month Month (1-12)
      * @return Returns a HashMap, key is day (1-31), value is whether clocked in
      */
     public HashMap<Integer, Boolean> getMonthClockInData(int year, int month) {
         HashMap<Integer, Boolean> result = new HashMap<>();
-        
+
         Calendar calendar = Calendar.getInstance();
         calendar.set(year, month - 1, 1);
-        
+
         int lastDay = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
-        
+
         for (int day = 1; day <= lastDay; day++) {
             calendar.set(Calendar.DAY_OF_MONTH, day);
             String dateString = mDateFormat.format(calendar.getTime());
             result.put(day, hasClockedIn(dateString));
         }
-        
+
         return result;
     }
 
@@ -103,7 +104,7 @@ public class ClockInManager {
     public int getConsecutiveClockInDays() {
         int count = 0;
         Calendar calendar = Calendar.getInstance();
-        
+
         while (true) {
             String dateString = mDateFormat.format(calendar.getTime());
             if (hasClockedIn(dateString)) {
@@ -113,7 +114,7 @@ public class ClockInManager {
                 break;
             }
         }
-        
+
         return count;
     }
 }
