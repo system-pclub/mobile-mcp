@@ -47,6 +47,7 @@ End-to-end latency breakdown:
 - adb, python3
 
 ### Quick Start
+- Convert to `test-latency-benchmark` branch for recreating our performance results
 
 ```bash
 # 1. Install apps
