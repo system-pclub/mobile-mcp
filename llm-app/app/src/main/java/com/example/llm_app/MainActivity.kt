@@ -219,14 +219,16 @@ class MainActivity : ComponentActivity() {
 
                     // Read attributes
                     for (i in 0 until parser.attributeCount) {
-                        sb.append(" ${parser.getAttributeName(i)}=\"${parser.getAttributeValue(i)}\"" )
+                        sb.append(" ${parser.getAttributeName(i)}=\"${parser.getAttributeValue(i)}\"")
                     }
 
                     sb.append(">")
                 }
+
                 XmlPullParser.TEXT -> {
                     sb.append(parser.text)
                 }
+
                 XmlPullParser.END_TAG -> {
                     sb.append("</${parser.name}>")
                 }
@@ -243,7 +245,7 @@ class MainActivity : ComponentActivity() {
     ) {
         val overallStartTime = System.currentTimeMillis()
         Log.d("LatencyTest", "=== Start processing: $overallStartTime ===")
-        
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val apiKey = assets.open("openai_key.txt")
@@ -253,7 +255,7 @@ class MainActivity : ComponentActivity() {
                 /* ================= 1️⃣ APP SELECTION ================= */
 //                onStatusUpdate("Selecting target app...")
                 val step1Start = System.currentTimeMillis()
-                
+
                 // [T1] Prompt Prep
                 val t1Start = System.currentTimeMillis()
                 val appList = JSONArray()
@@ -311,8 +313,11 @@ class MainActivity : ComponentActivity() {
                     ?: throw IllegalStateException("Package not found: $selectedPackage")
                 val t3End = System.currentTimeMillis()
                 Log.d("LatencyTest", "[T3] App Select Parse & Lookup: ${t3End - t3Start}ms")
-                
-                Log.d("openAI", "Selected package: $selectedPackage, app name: ${selectedApp.appName}")
+
+                Log.d(
+                    "openAI",
+                    "Selected package: $selectedPackage, app name: ${selectedApp.appName}"
+                )
                 onStatusUpdate("Select target app: ${selectedApp.appName} (${selectedApp.appDescription})")
 
 
@@ -378,7 +383,7 @@ class MainActivity : ComponentActivity() {
                 val commandJsonStr = callOpenAI(apiKey, capabilityPrompt)
                 val t5End = System.currentTimeMillis()
                 Log.d("LatencyTest", "[T5] Capability LLM Network: ${t5End - t5Start}ms")
-                
+
                 // [T6] Parse & Reconstruct
                 val t6Start = System.currentTimeMillis()
                 val commandObj = JSONObject(commandJsonStr)
@@ -406,15 +411,15 @@ class MainActivity : ComponentActivity() {
 
                 Log.d("openAI", "Final command: $finalCommand")
                 onStatusUpdate("Executing command: ${commandObj.getString("capability")}")
-                
-                
+
+
                 /* ================= 3️⃣ EXECUTION ================= */
                 // T7 & T8 handled inside executeCommand
-                
+
                 executeCommand(finalCommand) { result ->
                     val endTime = System.currentTimeMillis()
                     Log.d("LatencyTest", "=== Total Duration: ${endTime - overallStartTime}ms ===")
-                    
+
                     runOnUiThread {
                         Log.d("openAI", "execution result: $result")
                         onStatusUpdate("result: $result")
@@ -446,7 +451,7 @@ class MainActivity : ComponentActivity() {
         val endNet = System.currentTimeMillis()
         // Note: This log is inside the method to catch pure network time including read
         // The calling method also measures it as T2/T5, which includes function call overhead (negligible)
-        
+
         Log.d("openAI", "Raw response: $response")
 
         val root = JSONObject(response)
@@ -618,20 +623,12 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-//                reverseLayout = false
                 state = listState
             ) {
                 items(messages) {
                     ChatBubble(it)
                 }
             }
-
-            // Status
-//            Text(
-//                text = status,
-//                style = MaterialTheme.typography.bodySmall,
-//                color = Color.Gray
-//            )
 
             // Input row (like ChatGPT)
             Row(

@@ -10,8 +10,10 @@ import android.widget.Button;
 import android.widget.GridLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -190,7 +192,7 @@ public class MainActivity extends AppCompatActivity {
         textView.setText(day);
         textView.setTextSize(14);
         textView.setGravity(android.view.Gravity.CENTER);
-        
+
         GridLayout.LayoutParams params = new GridLayout.LayoutParams();
         params.width = 0;
         params.height = 120; // Fixed height for a better grid look

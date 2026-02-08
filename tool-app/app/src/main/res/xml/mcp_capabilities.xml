@@ -1,31 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mcp>
     <capability
-        id="clock_in_today"
         description="Clock in today."
+        id="clock_in_today"
         version="1" />
     <capability
-        id="query_clock_in"
         description="Query whether a specific date has been clocked in."
+        id="query_clock_in"
         version="1">
         <input>
-            <param name="date" type="string" required="true" description="Date to query in format yyyy-MM-dd" />
+            <param
+                name="date"
+                description="Date to query in format yyyy-MM-dd"
+                required="true"
+                type="string" />
         </input>
         <output>
-            <param name="date" type="string" description="The queried date" />
-            <param name="has_clocked_in" type="boolean" description="Whether the date has been clocked in" />
+            <param
+                name="date"
+                description="The queried date"
+                type="string" />
+            <param
+                name="has_clocked_in"
+                description="Whether the date has been clocked in"
+                type="boolean" />
         </output>
     </capability>
     <capability
-        id="make_up_clock_in"
         description="Make up a clock-in for a specific date."
+        id="make_up_clock_in"
         version="1">
         <input>
-            <param name="date" type="string" required="true" description="Date to make up clock-in in format yyyy-MM-dd" />
+            <param
+                name="date"
+                description="Date to make up clock-in in format yyyy-MM-dd"
+                required="true"
+                type="string" />
         </input>
         <output>
-            <param name="date" type="string" description="The date that was clocked in" />
-            <param name="success" type="boolean" description="Whether the make-up clock-in was successful" />
+            <param
+                name="date"
+                description="The date that was clocked in"
+                type="string" />
+            <param
+                name="success"
+                description="Whether the make-up clock-in was successful"
+                type="boolean" />
         </output>
     </capability>
 </mcp>

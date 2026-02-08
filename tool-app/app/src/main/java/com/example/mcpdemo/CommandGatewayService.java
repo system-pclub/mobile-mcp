@@ -10,6 +10,7 @@ import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
 import android.util.Log;
+
 import org.json.JSONObject;
 import org.json.JSONException;
 
@@ -26,7 +27,6 @@ public class CommandGatewayService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        // Bound-service pattern: return Messenger binder (no AIDL)
         return messenger.getBinder();
     }
 
@@ -125,7 +125,7 @@ public class CommandGatewayService extends Service {
     }
 
     /**
-     * 处理查询打卡命令
+     * handle query_clock_in
      *
      * @return JSONObject containing the result
      */
@@ -150,7 +150,7 @@ public class CommandGatewayService extends Service {
     }
 
     /**
-     * 处理补卡命令
+     * handle make_up_clock_in
      *
      * @return JSONObject containing the result
      */

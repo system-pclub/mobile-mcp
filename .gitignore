@@ -18,3 +18,4 @@ openai_key.txt
 **/openai_key.txt
 **/*.apk
 **/build/
+summary/
