@@ -4,27 +4,59 @@
 
 Mobile-MCP enables Android applications to expose capabilities to LLM-based assistants through a standardized protocol, using Android's native Intent mechanism.
 
+## Project Structure
+
+```text
+mobile-mcp/
+├── llm-app/                                # AI Assistant app
+│   └── app/src/main/
+│       ├── AndroidManifest.xml             # App registry
+│       ├── java/com/example/llm_app/
+│       │   ├── MainActivity.kt             # Discover MCP services, plan via LLM, invoke target service
+│       │   ├── McpResultBus.kt             # One-shot callback registry keyed by requestId
+│       │   └── McpResultReceiver.kt        # Receives service callback broadcast and dispatches to McpResultBus
+│       └── res/                            # UI/resources
+├── tool-app/                               # Tool provider app
+│   └── app/src/main/
+│       ├── AndroidManifest.xml             # App registry: exported MCP service, capability metadata link
+│       ├── java/com/example/mcpdemo/
+│       │   ├── MainActivity.java           # Clock-in demo UI and local interactions
+│       │   ├── CommandGatewayService.java  # Parses MCP command JSON and returns callback result
+│       │   └── ClockInManager.java         # Stores/queries clock-in data
+│       └── res/xml/mcp_capabilities.xml    # Tool capability schema
+├── gradle/wrapper/                         # Gradle wrapper config
+├── settings.gradle.kts                     # Composite build entry
+├── build.gradle.kts                        # Root build config
+├── gradle.properties                       # Root Gradle properties
+├── gradlew / gradlew.bat                   # Build launchers
+└── README.md
+```
+
 ## Architecture
 
 ```
 User Natural Language Input
-        ↓
-    [LLM-APP]
-        ├─ Service Discovery (PackageManager)
-        ├─ App Selection (LLM reasoning)
-        ├─ Service Selection (LLM reasoning)
-        └─ Intent-based Invocation
-        ↓
-    [Tool-APP]
-        └─ Service Handler → Result
+          ↓
+      [LLM-APP]
+          ├─ MCP Service Discovery (PackageManager)
+          ├─ App Selection (LLM reasoning)
+          ├─ Service Selection (LLM reasoning)
+          └─ Intent-based Invocation (with PendingIntent callback)
+          ↓
+      [Tool-APP]
+          ├─ CommandGatewayService (parse/dispatch command)
+          └─ Result Callback
+                ↓
+      [LLM-APP]
+          └─ McpResultReceiver → McpResultBus → UI
 ```
 
 ## Comparison
 
 | Approach         | Third-party Tools | Protocol-based | Security Control |
 | ---------------- | ----------------- | -------------- | ---------------- |
-| Coordinated APIs | ✗                 | ✗              | ✓                |
-| GUI Observation  | ✓                 | ✗              | ✗                |
+| Qwen / Apple Intelligence | ✗        | ✗              | ✓                |
+| AppAgent / AppAgentX      | ✓        | ✗              | ✗                |
 | **Mobile-MCP**   | **✓**             | **✓**          | **✓**            |
 
 ## Performance Benchmark
