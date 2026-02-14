@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
 
     private fun retrieveMcpCapabilities() {
         val pm = packageManager
-        val intent = Intent("com.example.mcpdemo.COMMAND_GATEWAY")
+        val intent = Intent("mobile.mcp.SERVICE")
 
         val services = pm.queryIntentServices(
             intent,
@@ -93,10 +93,10 @@ class MainActivity : ComponentActivity() {
             val appInfo = serviceInfo.applicationInfo
 
             val meta = serviceInfo.metaData ?: continue
-            if (!meta.containsKey("mcp.capabilities")) continue
+            if (!meta.containsKey("mobile.mcp.tool.capabilities")) continue
 
             try {
-                val resId = meta.getInt("mcp.capabilities")
+                val resId = meta.getInt("mobile.mcp.tool.capabilities")
 
                 // Remote resources
                 val remoteRes = pm.getResourcesForApplication(appInfo)
@@ -337,24 +337,16 @@ class MainActivity : ComponentActivity() {
                 // [T6] Parse & Reconstruct
                 val t6Start = System.currentTimeMillis()
                 val commandObj = JSONObject(commandJsonStr)
-                val argsObj = commandObj.getJSONObject("args")
 
                 val commandJson = JSONObject().apply {
-                    // still keep capability at top level
-                    put("capability", commandObj.getString("capability"))
-
-                    // copy all fields from args directly into commandJson
-                    val keys = argsObj.keys()
-                    while (keys.hasNext()) {
-                        val key = keys.next()
-                        put(key, argsObj.get(key))
-                    }
+                    put("id", commandObj.getString("capability"))
+                    put("args", commandObj.getString("args"))
                 }
 
                 val finalCommand = JSONObject().apply {
                     put("package", selectedPackage)
                     put("service", commandObj.getString("service"))
-                    put("commandJson", commandJson)
+                    put("capability", commandJson)
                 }
                 val t6End = System.currentTimeMillis()
                 Log.d("LatencyTest", "[T6] Capability Parse & Reconstruct: ${t6End - t6Start}ms")
@@ -440,17 +432,16 @@ class MainActivity : ComponentActivity() {
     private fun executeCommand(command: JSONObject, onResult: (String) -> Unit) {
         val pkg = command.getString("package")
         val serviceClass = command.getString("service")
-        val commandJsonStr = command.getJSONObject("commandJson").toString()
 
         val requestId = UUID.randomUUID().toString()
 
         // Register callback
-        McpResultBus.register(requestId) { resultJson ->
+        McpResultBus.register(requestId) { response ->
             val msg = try {
-                Log.d("executeCommand", "resultJson: $resultJson")
-                JSONObject(resultJson).optString("message", resultJson)
+                Log.d("executeCommand", "response: $response")
+                JSONObject(response).optString("message", response)
             } catch (_: Exception) {
-                resultJson
+                response
             }
             onResult(msg)
         }
@@ -475,10 +466,14 @@ class MainActivity : ComponentActivity() {
             flags
         )
 
+        val requestJson = JSONObject().apply {
+            put("id", requestId)
+            put("capability", command.getJSONObject("capability"))
+        }
+
         val intent = Intent().apply {
             component = ComponentName(pkg, serviceClass)
-            putExtra("mcp_command_json", commandJsonStr)
-            putExtra("mcp_request_id", requestId)
+            putExtra("request", requestJson.toString())
             putExtra("mcp_callback", pending)
         }
 

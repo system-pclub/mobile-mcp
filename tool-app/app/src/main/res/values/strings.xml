@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">MCP Demo</string>
+    <string name="app_name">Daily Clock-in</string>
     <string name="app_desc">An application for daily clocking in and managing records. You can perform clock-ins, view clock-in records, and make up for missed clock-ins.</string>
     <string name="waiting">waiting...</string>
     <string name="click_me">click me</string>

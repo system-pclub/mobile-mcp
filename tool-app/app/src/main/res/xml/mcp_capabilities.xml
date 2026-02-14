@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<mcp>
+<mobile-mcp-capabilities>
     <capability
         id="clock_in_today"
         description="Clock in today."
@@ -9,11 +9,21 @@
         description="Query whether a specific date has been clocked in."
         version="1">
         <input>
-            <param name="date" type="string" required="true" description="Date to query in format yyyy-MM-dd" />
+            <param
+                name="date"
+                type="string"
+                required="true"
+                description="Date to query in format yyyy-MM-dd" />
         </input>
         <output>
-            <param name="date" type="string" description="The queried date" />
-            <param name="has_clocked_in" type="boolean" description="Whether the date has been clocked in" />
+            <param
+                name="date"
+                type="string"
+                description="The queried date" />
+            <param
+                name="has_clocked_in"
+                type="boolean"
+                description="Whether the date has been clocked in" />
         </output>
     </capability>
     <capability
@@ -21,11 +31,21 @@
         description="Make up a clock-in for a specific date."
         version="1">
         <input>
-            <param name="date" type="string" required="true" description="Date to make up clock-in in format yyyy-MM-dd" />
+            <param
+                name="date"
+                type="string"
+                required="true"
+                description="Date to make up clock-in in format yyyy-MM-dd" />
         </input>
         <output>
-            <param name="date" type="string" description="The date that was clocked in" />
-            <param name="success" type="boolean" description="Whether the make-up clock-in was successful" />
+            <param
+                name="date"
+                type="string"
+                description="The date that was clocked in" />
+            <param
+                name="success"
+                type="boolean"
+                description="Whether the make-up clock-in was successful" />
         </output>
     </capability>
-</mcp>
+</mobile-mcp-capabilities>

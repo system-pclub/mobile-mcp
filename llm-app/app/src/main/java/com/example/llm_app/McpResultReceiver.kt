@@ -8,9 +8,9 @@ import android.util.Log
 class McpResultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val requestId = intent.getStringExtra("mcp_request_id").orEmpty()
-        val resultJson = intent.getStringExtra("result_json").orEmpty()
+        val resultJson = intent.getStringExtra("response").orEmpty()
 
-        Log.d("MCP_RESULT", "requestId=$requestId result=$resultJson")
+        Log.d("MCP_RESULT", "requestId=$requestId response=$resultJson")
 
         // Forward to an in-memory callback registry (see below)
         McpResultBus.deliver(requestId, resultJson)

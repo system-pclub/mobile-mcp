@@ -31,19 +31,19 @@
 
             <!-- App-level metadata -->
             <meta-data
-                android:name="mcp.application.name"
-                android:value="Daily Clock-in" />
+                android:name="mobile.mcp.tool.name"
+                android:value="@string/app_name" />
             <meta-data
-                android:name="mcp.application.description"
+                android:name="mobile.mcp.tool.description"
                 android:value="@string/app_desc" />
 
             <!-- Tool-level metadata -->
             <meta-data
-                android:name="mcp.capabilities"
+                android:name="mobile.mcp.tool.capabilities"
                 android:resource="@xml/mcp_capabilities" />
 
             <intent-filter>
-                <action android:name="com.example.mcpdemo.COMMAND_GATEWAY" />
+                <action android:name="mobile.mcp.SERVICE" />
             </intent-filter>
         </service>
 

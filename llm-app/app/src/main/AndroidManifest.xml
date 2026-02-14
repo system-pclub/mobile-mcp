@@ -8,7 +8,7 @@
     <!-- App visibility (Android 11+) -->
     <queries>
         <intent>
-            <action android:name="com.example.mcpdemo.COMMAND_GATEWAY" />
+            <action android:name="mobile.mcp.SERVICE" />
         </intent>
     </queries>
 
