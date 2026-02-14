@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<mcp>
+<mobile-mcp-capabilities>
     <capability
         description="Clock in today."
         id="clock_in_today"
@@ -48,4 +48,4 @@
                 type="boolean" />
         </output>
     </capability>
-</mcp>
+</mobile-mcp-capabilities>

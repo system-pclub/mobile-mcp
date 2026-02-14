@@ -11,6 +11,7 @@ import android.os.Messenger;
 import android.os.RemoteException;
 import android.util.Log;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONException;
 
@@ -48,17 +49,33 @@ public class CommandGatewayService extends Service {
             Bundle data = msg.getData();
             if (data == null) return;
 
-            String commandJson = data.getString("mcp_command_json", "");
-            String requestId = data.getString("mcp_request_id", "");
-
-            Log.d("MCPDemo", "Received MCP command: " + commandJson);
+            String requestStr = data.getString("request", "");
+            Log.d("MCPDemo", "Received MCP request: " + requestStr);
             String resultJson;
             JSONObject result = new JSONObject();
 
+            JSONObject requestObj;
+            try {
+                requestObj = new JSONObject(requestStr);
+            } catch (JSONException e) {
+                Log.e("MCPDemo", "request is not json");
+                return;
+            }
+
+            String requestId = requestObj.optString("id");
+            if (requestId.isEmpty()) {
+                Log.e("MCPDemo", "Missing request id");
+                return;
+            }
+
             try {
                 // 1. Parse JSON
-                JSONObject json = new JSONObject(commandJson);
-                String capabilityId = json.optString("capability");
+                JSONObject commandJson = requestObj.optJSONObject("capability");
+                if (commandJson == null) {
+                    Log.e("MCPDemo", "Missing capability");
+                    return;
+                }
+                String capabilityId = commandJson.optString("id");
 
                 // 2. Route by capability
                 switch (capabilityId) {
@@ -69,26 +86,28 @@ public class CommandGatewayService extends Service {
                         result.put("message", "Clock in successfully!");
                         break;
                     case "query_clock_in":
-                        result = service.handleQueryClockIn(json);
+                        result = service.handleQueryClockIn(commandJson);
                         break;
                     case "make_up_clock_in":
-                        result = service.handleMakeUpClockIn(json);
+                        result = service.handleMakeUpClockIn(commandJson);
                         break;
                     default:
                         Log.e("MCP", "Received unknown capability ID: " + capabilityId);
-                        result.put("status", "error");
+                        result.put("status", "failure");
                         result.put("message", "Unknown capability ID: " + capabilityId);
                         break;
                 }
+                result.put("id", requestId);
                 resultJson = result.toString();
             } catch (Exception e) {
                 Log.e("MCP", "JSON parsing or execution exception", e);
                 try {
-                    result.put("status", "error");
+                    result.put("id", requestId);
+                    result.put("status", "failure");
                     result.put("message", e.getMessage());
                     resultJson = result.toString();
                 } catch (JSONException jsonException) {
-                    resultJson = "{\"status\":\"error\", \"message\":\"" + e.getMessage() + "\"}";
+                    resultJson = "{\"id\":\"" + requestId + ", \"status\":\"failure\", \"message\":\"" + e.getMessage() + "\"}";
                 }
             }
 
@@ -98,7 +117,7 @@ public class CommandGatewayService extends Service {
                 Message reply = Message.obtain(null, MSG_RESULT);
                 Bundle out = new Bundle();
                 out.putString("mcp_request_id", requestId);
-                out.putString("result_json", resultJson);
+                out.putString("response", resultJson);
                 reply.setData(out);
 
                 try {
@@ -130,22 +149,41 @@ public class CommandGatewayService extends Service {
      * @return JSONObject containing the result
      */
     private JSONObject handleQueryClockIn(JSONObject json) throws JSONException {
-        String date = json.optString("date", "");
-        boolean hasClockedIn = clockInManager.hasClockedIn(date);
+        JSONObject response = new JSONObject();
+        String argsStr = json.optString("args");
+        JSONObject args = new JSONObject(argsStr);
+        JSONObject capabilityRes = new JSONObject();
+        capabilityRes.put("id", json.optString("id"));
+        String date = args.optString("date", "");
+        if (date.isEmpty()) {
+            Log.e("MCPDemo", "Missing args");
+            response.put("status", "failure");
+            response.put("message", "Missing args.");
+            return response;
+        }
 
+        boolean hasClockedIn = clockInManager.hasClockedIn(date);
         Log.d("MCP", "Query " + date + " clock-in status: " + hasClockedIn);
 
-        JSONObject response = new JSONObject();
         response.put("status", "success");
-        JSONObject data = new JSONObject();
-        data.put("date", date);
-        data.put("has_clocked_in", hasClockedIn);
+        JSONArray output = new JSONArray();
+        JSONObject dateObj = new JSONObject();
+        dateObj.put("name", "date");
+        dateObj.put("type", "string");
+        dateObj.put("value", date);
+        output.put(dateObj);
+        JSONObject boolObj = new JSONObject();
+        boolObj.put("name", "has_clocked_in");
+        boolObj.put("type", "boolean");
+        boolObj.put("value", hasClockedIn);
+        output.put(boolObj);
         if (hasClockedIn) {
             response.put("message", "Has clocked in.");
         } else {
             response.put("message", "Hasn't clocked in.");
         }
-        response.put("data", data);
+        capabilityRes.put("output", output);
+        response.put("capability", capabilityRes);
         return response;
     }
 
@@ -155,9 +193,20 @@ public class CommandGatewayService extends Service {
      * @return JSONObject containing the result
      */
     private JSONObject handleMakeUpClockIn(JSONObject json) throws JSONException {
+        JSONObject response = new JSONObject();
+        String argsStr = json.optString("args");
+        JSONObject args = new JSONObject(argsStr);
+        JSONObject capabilityRes = new JSONObject();
+        capabilityRes.put("id", json.optString("id"));
         String date = json.optString("date", "");
-        clockInManager.clockInDate(date);
+        if (date.isEmpty()) {
+            Log.e("MCPDemo", "Missing args");
+            response.put("status", "failure");
+            response.put("message", "Missing args.");
+            return response;
+        }
 
+        clockInManager.clockInDate(date);
         Log.d("MCP", "Make up clock-in for " + date);
 
         // Send broadcast to notify UI refresh
@@ -166,13 +215,23 @@ public class CommandGatewayService extends Service {
         intent.setPackage(getPackageName());
         sendBroadcast(intent);
 
-        JSONObject response = new JSONObject();
         response.put("status", "success");
         response.put("message", "Make up clock-in successful for " + date); // Unify: add message to the outermost layer
 
-        JSONObject data = new JSONObject();
-        data.put("date", date);
-        response.put("data", data);
+        JSONArray output = new JSONArray();
+        JSONObject dateObj = new JSONObject();
+        dateObj.put("name", "date");
+        dateObj.put("type", "string");
+        dateObj.put("value", date);
+        output.put(dateObj);
+        JSONObject boolObj = new JSONObject();
+        boolObj.put("name", "success");
+        boolObj.put("type", "boolean");
+        boolObj.put("value", "true");
+        output.put(boolObj);
+
+        capabilityRes.put("output", output);
+        response.put("capability", capabilityRes);
         return response;
     }
 }

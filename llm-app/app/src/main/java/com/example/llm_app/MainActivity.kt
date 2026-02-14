@@ -80,10 +80,10 @@ class MainActivity : ComponentActivity() {
 
             val data = msg.data ?: return
             val requestId = data.getString("mcp_request_id") ?: return
-            val resultJson = data.getString("result_json").orEmpty()
+            val response = data.getString("response").orEmpty()
 
             val cb = pendingCallbacks.remove(requestId)
-            cb?.invoke(resultJson)
+            cb?.invoke(response)
         }
     })
 
@@ -129,7 +129,7 @@ class MainActivity : ComponentActivity() {
 
     private fun retrieveMcpCapabilities() {
         val pm = packageManager
-        val intent = Intent("com.example.mcpdemo.COMMAND_GATEWAY")
+        val intent = Intent("mobile.mcp.SERVICE")
 
         val services = pm.queryIntentServices(
             intent,
@@ -143,10 +143,10 @@ class MainActivity : ComponentActivity() {
             val appInfo = serviceInfo.applicationInfo
 
             val meta = serviceInfo.metaData ?: continue
-            if (!meta.containsKey("mcp.capabilities")) continue
+            if (!meta.containsKey("mobile.mcp.tool.capabilities")) continue
 
             try {
-                val resId = meta.getInt("mcp.capabilities")
+                val resId = meta.getInt("mobile.mcp.tool.capabilities")
 
                 // Remote resources
                 val remoteRes = pm.getResourcesForApplication(appInfo)
@@ -390,21 +390,14 @@ class MainActivity : ComponentActivity() {
                 val argsObj = commandObj.getJSONObject("args")
 
                 val commandJson = JSONObject().apply {
-                    // still keep capability at top level
-                    put("capability", commandObj.getString("capability"))
-
-                    // copy all fields from args directly into commandJson
-                    val keys = argsObj.keys()
-                    while (keys.hasNext()) {
-                        val key = keys.next()
-                        put(key, argsObj.get(key))
-                    }
+                    put("id", commandObj.getString("capability"))
+                    put("args", commandObj.getString("args"))
                 }
 
                 val finalCommand = JSONObject().apply {
                     put("package", selectedPackage)
                     put("service", commandObj.getString("service"))
-                    put("commandJson", commandJson)
+                    put("capability", commandJson)
                 }
                 val t6End = System.currentTimeMillis()
                 Log.d("LatencyTest", "[T6] Capability Parse & Reconstruct: ${t6End - t6Start}ms")
@@ -490,7 +483,6 @@ class MainActivity : ComponentActivity() {
     private fun executeCommand(command: JSONObject, onResult: (String) -> Unit) {
         val pkg = command.getString("package")
         val serviceClass = command.getString("service")
-        val commandJsonStr = command.getJSONObject("commandJson").toString()
 
         val key = "$pkg|$serviceClass"
 
@@ -513,22 +505,27 @@ class MainActivity : ComponentActivity() {
 
         fun sendNow() {
             val requestId = UUID.randomUUID().toString()
-            pendingCallbacks[requestId] = { resultJson ->
+            pendingCallbacks[requestId] = { response ->
                 // Extract "message" for UI
                 val msgText = try {
-                    Log.d("executeCommand", "resultJson: $resultJson")
-                    JSONObject(resultJson).optString("message", resultJson)
+                    Log.d("executeCommand", "response: $response")
+                    JSONObject(response).optString("message", response)
                 } catch (_: Exception) {
-                    resultJson
+                    response
                 }
                 onResult(msgText)
+            }
+
+            val requestJson = JSONObject().apply {
+                put("id", requestId)
+                put("capability", command.getJSONObject("capability"))
             }
 
             val m = Message.obtain(null, MSG_INVOKE)
             m.replyTo = replyMessenger
             m.data = Bundle().apply {
-                putString("mcp_request_id", requestId)
-                putString("mcp_command_json", commandJsonStr)
+//                putString("mcp_request_id", requestId)
+                putString("request", requestJson.toString())
             }
 
             try {
