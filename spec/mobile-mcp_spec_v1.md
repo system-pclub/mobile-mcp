@@ -112,7 +112,7 @@ The `<output>` element is OPTIONAL. If present, it MAY contain zero or more `<pa
 ### 2. Tool Capability Discovery
 This section defines how a Mobile-MCP compliant AI assistant/agent discovers registered tools and retrieves their declared capability descriptors. 
  
-An Agent MUST discover Mobile-MCP tools using Android’s Intent resolution mechanism. Specifically, it MUST create an Intent with the action string "mobile.mcp.SERVICE", which corresponds to the Intent filter defined in Section 2.1, and then use this Intent to query for Mobile-MCP compliant tools.
+An Agent MUST discover Mobile-MCP tools using Android’s Intent resolution mechanism. Specifically, it MUST create an Intent with the action string "mobile.mcp.SERVICE", which corresponds to the Intent filter defined in [Section 1.1](#11-service-declaration), and then use this Intent to query for Mobile-MCP compliant tools.
 
 ``` kotlin
 val intent = Intent("mobile.mcp.SERVICE")
