@@ -191,7 +191,7 @@ public class CommandGatewayService extends Service {
         JSONObject args = new JSONObject(argsStr);
         JSONObject capabilityRes = new JSONObject();
         capabilityRes.put("id", json.optString("id"));
-        String date = json.optString("date", "");
+        String date = args.optString("date", "");
         if (date.isEmpty()) {
             Log.e("MCPDemo", "Missing args");
             response.put("status", "failure");
