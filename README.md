@@ -56,7 +56,7 @@ User Natural Language Input
           └─ McpResultReceiver → McpResultBus → UI
 ```
 
-## Comparison
+## Comparison with Existing AI Assistants
 
 | Approach         | Open Ecosystem | Security Control | 
 |:---------------- |:-----------------:|:--------------:| 
