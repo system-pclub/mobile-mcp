@@ -8,12 +8,13 @@ created: 2026-02-14
 
 ## Simple Summary
 
-A standard protocol for Android applications to expose capabilities to on-device AI assistants.
+A standard protocol for AI assistants to access application capabilities on Android smartphones. 
 
+*Mobile-MCP is an open proposal. We welcome discussion and collaboration on security, permission models, and ecosystem design.*
 
 ## Abstract
 
-This specification defines the first on-device capability protocol for Android AI assistants. The protocol standardizes how Android applications expose fine-grained tool capabilities to AI agents through the Android Intent mechanism, enabling secure, local, and discoverable capability invocation while preserving operating system security boundaries.
+This specification introduces the first on-device capability protocol designed specifically for AI assistants on Android. It standardizes how Android applications expose fine-grained tool capabilities via the Android Intent mechanism, how AI assistants discover those capabilities, and how they invoke them in a structured way.
 
 
 ## Motivation
@@ -111,7 +112,7 @@ The `<output>` element is OPTIONAL. If present, it MAY contain zero or more `<pa
 ### 2. Tool Capability Discovery
 This section defines how a Mobile-MCP compliant AI assistant/agent discovers registered tools and retrieves their declared capability descriptors. 
  
-An Agent MUST discover Mobile-MCP tools using Android’s Intent resolution mechanism. Specifically, it MUST create an Intent with the action string "mobile.mcp.SERVICE", which corresponds to the Intent filter defined in Section 2.1, and then use this Intent to query for Mobile-MCP compliant tools.
+An Agent MUST discover Mobile-MCP tools using Android’s Intent resolution mechanism. Specifically, it MUST create an Intent with the action string "mobile.mcp.SERVICE", which corresponds to the Intent filter defined in [Section 1.1](#11-service-declaration), and then use this Intent to query for Mobile-MCP compliant tools.
 
 ``` kotlin
 val intent = Intent("mobile.mcp.SERVICE")
@@ -128,7 +129,7 @@ For each resolved service, the Agent MUST retrieve the tool’s human-readable n
 
 To obtain the capability descriptor, the Agent MUST first retrieve the target application's ApplicationInfo object and then call PackageManager.getResourcesForApplication(ApplicationInfo) to access the application's resource bundle. The XML descriptor can subsequently be loaded using the Resources.getXml(int) method with the resource identifier obtained from the service metadata. The structure and schema of the capability descriptor XML are defined in [Section 1.2](#12-capability-descriptor-resource-format).
  
-The Agent MAY leverage a large language model (LLM) to determine which tool and which specific capability to invoke. The design and operation of such decision-making logic are outside the scope of this specification.
+The Agent MAY leverage a large language model (LLM) to determine which tool and which specific capability to invoke. The design and implementation of such decision-making logic are outside the scope of this specification.
 
 ### 3. Tool Capability Invocation
 This section defines how an agent MUST invoke a Mobile-MCP capability, how a Mobile-MCP compliant tool MUST handle such invocations, and how an agent MUST interpret the returned results. 
@@ -144,7 +145,7 @@ An Agent MUST use a JSON string to specify the capability to be invoked and its 
       "id": "UUID",
       "capability": {
         "id": "CAPABILITY_ID",
-        "args": {
+        "input": {
               "name1": "VALUE1",
               "name2": "VALUE2"
             }
@@ -156,12 +157,11 @@ An Agent MUST use a JSON string to specify the capability to be invoked and its 
 
 - request.id: a unique identifier within the agent for this invocation
 - capability.id: the identifier of the target capability within the tool
-- input: optional; contains zero or more <param> representing the capability inputs
+- input: optional; a JSON object containing key-value pairs representing the input parameters
   - name: parameter name, as defined in the tool’s capability descriptor
-  - type: parameter type, as defined in the tool’s capability descriptor
   - value: the value for the parameter
 
-An Agent MAY invoke a capability in one of two ways: (1) by establishing a persistent binding to the Tool service and sending messages through the binding, or (2) by sending an explicit Intent to the service. In either case, the Agent MUST use the Tool’s package name and service name to explicitly identify the target service. In addition, a callback mechanism MUST be provided, as required by the Android Intent-based communication model. In our demonstration, we use a PendingIntent as the callback mechanism and implement a class inheriting from BroadcastReceiver to handle the response. These concern transport-level implementation details and are outside the scope of this protocol specification.
+An Agent MAY invoke a capability in one of two ways: (1) by establishing a persistent binding to the Tool service and sending messages through the binding, or (2) by sending an explicit Intent to the service. In either case, the Agent MUST use the Tool’s package name and service name to explicitly identify the target service. In addition, a callback mechanism MUST be provided, as required by Android's Intent-based communication model. In our demonstration, we use a PendingIntent as the callback and implement a class inheriting from BroadcastReceiver to handle the response. These concern transport-level implementation details and are outside the scope of this protocol specification.
 
 #### 3.2 Request Handling
 Upon receiving a Mobile-MCP request, the Tool service MUST extract the JSON payload using "mobile-mcp-request" as the Intent extra key. The Tool MUST then validate the version field of the request. The Tool MUST record the request.id and include the same identifier in the corresponding response. Next, the Tool MUST verify that the specified capability.id corresponds to a supported capability. If a matching capability is found, the Tool MUST validate that the input parameters conform to the schema defined in the capability descriptor. If validation succeeds, the Tool MUST invoke the corresponding capability implementation with the provided parameters.
@@ -175,13 +175,10 @@ The result is encoded in the following schema.
       "id": "UUID",
       "capability": {
         "id": "CAPABILITY_ID",
-        "output": [
-            {
-              "name": "PARAM_NAME",
-              "type": "TYPE",
-              "value": "VALUE"
+        "output": {
+              "name1": "VALUE1",
+              "name2": "VALUE2"
             }
-          ]
       },
       "status": "success",
       "message": "Optional error description or success notification."
@@ -190,14 +187,14 @@ The result is encoded in the following schema.
 }
 ```
 
-- request.id: must be the same as the id of the corresponding request
+- response.id: must be the same as the id of the corresponding request
 - capability.id: the identifier of the target capability within the tool
-- output: optional; contains zero or more `<param>` representing the capability outputs
+- output: optional; a JSON object containing key-value pairs representing the output parameters
   - name: return name, as defined in the tool’s capability descriptor
-  - type: return type, as defined in the tool’s capability descriptor
   - value: the value for the return
 - status: “success” or “failure”
 - message: optional; natural-language description for the failure reason or the successful event.
+
 One possible way to return the result is to create an Intent, attach the JSON response string as an extra, and deliver it by invoking the send(Context, int, Intent) method of the PendingIntent. This implementation detail is not part of the protocol specification. 
 
 #### 3.3 Result Interpretation 
