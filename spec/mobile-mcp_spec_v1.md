@@ -156,8 +156,8 @@ An Agent MUST use a JSON string to specify the capability to be invoked and its 
 ```
 
 - request.id: a unique identifier within the agent for this invocation
-- request.capability.id: the identifier of the target capability within the tool
-- request.capability.input: optional; a JSON object containing key-value pairs representing the input parameters
+- capability.id: the identifier of the target capability within the tool
+- input: optional; a JSON object containing key-value pairs representing the input parameters
   - name: parameter name, as defined in the tool’s capability descriptor
   - value: the value for the parameter
 
@@ -188,12 +188,12 @@ The result is encoded in the following schema.
 ```
 
 - response.id: must be the same as the id of the corresponding request
-- response.capability.id: the identifier of the target capability within the tool
-- response.capability.output: optional; a JSON object containing key-value pairs representing the output parameters
+- capability.id: the identifier of the target capability within the tool
+- output: optional; a JSON object containing key-value pairs representing the output parameters
   - name: return name, as defined in the tool’s capability descriptor
   - value: the value for the return
-- response.status: “success” or “failure”
-- response.message: optional; natural-language description for the failure reason or the successful event.
+- status: “success” or “failure”
+- message: optional; natural-language description for the failure reason or the successful event.
 One possible way to return the result is to create an Intent, attach the JSON response string as an extra, and deliver it by invoking the send(Context, int, Intent) method of the PendingIntent. This implementation detail is not part of the protocol specification. 
 
 #### 3.3 Result Interpretation 
