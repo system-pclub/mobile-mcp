@@ -2,12 +2,17 @@
 
 ## Overview
 
-Mobile-MCP enables Android applications to expose capabilities to LLM-based assistants through a standardized protocol, using Android's native Intent mechanism.
+Mobile-MCP enables Android applications to expose capabilities to LLM-based assistants through a standardized protocol. Instead of introducing new system primitives, Mobile-MCP reuses Android's Intent system to support secure, protocol-driven tool invocatons by AI assistants. 
+
+This repository contains the protocol specification of Mobile-MCP and a prototype demonstration. 
+
+*Mobile-MCP is an open proposal and is still in an early stage. We welcome discussion and collaboration on security, permission models, and ecosystem design.*
 
 ## Project Structure
 
 ```text
 mobile-mcp/
+├── gradle/wrapper/                         # Gradle wrapper config
 ├── llm-app/                                # AI Assistant app
 │   └── app/src/main/
 │       ├── AndroidManifest.xml             # App registry
@@ -16,6 +21,7 @@ mobile-mcp/
 │       │   ├── McpResultBus.kt             # One-shot callback registry keyed by requestId
 │       │   └── McpResultReceiver.kt        # Receives service callback broadcast and dispatches to McpResultBus
 │       └── res/                            # UI/resources
+├── spec/                                   # protocol specifications
 ├── tool-app/                               # Tool provider app
 │   └── app/src/main/
 │       ├── AndroidManifest.xml             # App registry: exported MCP service, capability metadata link
@@ -24,7 +30,6 @@ mobile-mcp/
 │       │   ├── CommandGatewayService.java  # Parses MCP command JSON and returns callback result
 │       │   └── ClockInManager.java         # Stores/queries clock-in data
 │       └── res/xml/mcp_capabilities.xml    # Tool capability schema
-├── gradle/wrapper/                         # Gradle wrapper config
 ├── settings.gradle.kts                     # Composite build entry
 ├── build.gradle.kts                        # Root build config
 ├── gradle.properties                       # Root Gradle properties
@@ -53,13 +58,17 @@ User Natural Language Input
 
 ## Comparison
 
-| Approach         | Third-party Tools | Protocol-based | Security Control |
-| ---------------- | ----------------- | -------------- | ---------------- |
-| Qwen / Apple Intelligence | ✗        | ✗              | ✓                |
-| AppAgent / AppAgentX      | ✓        | ✗              | ✗                |
-| **Mobile-MCP**   | **✓**             | **✓**          | **✓**            |
+| Approach         | Open Ecosystem | Security Control | 
+| ---------------- | ----------------- | -------------- | 
+| Qwen               | ✗                 | ✓             |
+| Apple Intelligence | ✗                 | ✓             | 
+| AppAgent           | ✓                 | ✗             |
+| droidrun           | ✓                 | ✗             |
+| Mobile-Agent       | ✓                 | ✗             |
+| AutoDroid          | ✓                 | ✗             |
+| **Mobile-MCP**     | **✓**             | **✓**          | 
 
-## Performance Benchmark
+## Performance Evaluation
 
 End-to-end latency breakdown:
 
@@ -71,7 +80,7 @@ End-to-end latency breakdown:
 | Service Selection (LLM) | 749.9ms | 51.5% |
 | Local Service Execution | 12.5ms  | 0.9%  |
 
-## Reproducing Results
+## Trying the Prototype
 
 ### Prerequisites
 
