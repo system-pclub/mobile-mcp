@@ -192,8 +192,8 @@ The result is encoded in the following schema.
 - response.capability.output: optional; a JSON object containing key-value pairs representing the output parameters
   - name: return name, as defined in the tool’s capability descriptor
   - value: the value for the return
-- response.capability.status: “success” or “failure”
-- response.capability.message: optional; natural-language description for the failure reason or the successful event.
+- response.status: “success” or “failure”
+- response.message: optional; natural-language description for the failure reason or the successful event.
 One possible way to return the result is to create an Intent, attach the JSON response string as an extra, and deliver it by invoking the send(Context, int, Intent) method of the PendingIntent. This implementation detail is not part of the protocol specification. 
 
 #### 3.3 Result Interpretation 
