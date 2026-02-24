@@ -8,12 +8,13 @@ created: 2026-02-14
 
 ## Simple Summary
 
-A standard protocol for Android applications to expose capabilities to on-device AI assistants.
+A standard protocol for AI assistants to access application capabilities on Android smartphones. 
 
+*Mobile-MCP is an open proposal. We welcome discussion and collaboration on security, permission models, and ecosystem design.*
 
 ## Abstract
 
-This specification defines the first on-device capability protocol for Android AI assistants. The protocol standardizes how Android applications expose fine-grained tool capabilities to AI agents through the Android Intent mechanism, enabling secure, local, and discoverable capability invocation while preserving operating system security boundaries.
+This specification introduces the first on-device capability protocol designed specifically for AI assistants on Android. It standardizes how Android applications expose fine-grained tool capabilities via the Android Intent mechanism, how AI assistants discover those capabilities, and how they invoke them in a structured way.
 
 
 ## Motivation
