@@ -138,7 +138,7 @@ public class CommandGatewayService extends Service {
      */
     private JSONObject handleQueryClockIn(JSONObject json) throws JSONException {
         JSONObject response = new JSONObject();
-        String argsStr = json.optString("args");
+        String argsStr = json.optString("input");
         JSONObject args = new JSONObject(argsStr);
         JSONObject capabilityRes = new JSONObject();
         capabilityRes.put("id", json.optString("id"));
@@ -154,17 +154,9 @@ public class CommandGatewayService extends Service {
         Log.d("MCP", "Query " + date + " clock-in status: " + hasClockedIn);
 
         response.put("status", "success");
-        JSONArray output = new JSONArray();
-        JSONObject dateObj = new JSONObject();
-        dateObj.put("name", "date");
-        dateObj.put("type", "string");
-        dateObj.put("value", date);
-        output.put(dateObj);
-        JSONObject boolObj = new JSONObject();
-        boolObj.put("name", "has_clocked_in");
-        boolObj.put("type", "boolean");
-        boolObj.put("value", hasClockedIn);
-        output.put(boolObj);
+        JSONObject output = new JSONObject();
+        output.put("date", date);
+        output.put("has_clocked_in", hasClockedIn);
         if (hasClockedIn) {
             response.put("message", "Has clocked in.");
         } else {
@@ -182,11 +174,11 @@ public class CommandGatewayService extends Service {
      */
     private JSONObject handleMakeUpClockIn(JSONObject json) throws JSONException {
         JSONObject response = new JSONObject();
-        String argsStr = json.optString("args");
+        String argsStr = json.optString("input");
         JSONObject args = new JSONObject(argsStr);
         JSONObject capabilityRes = new JSONObject();
         capabilityRes.put("id", json.optString("id"));
-        String date = json.optString("date", "");
+        String date = args.optString("date", "");
         if (date.isEmpty()) {
             Log.e("MCPDemo", "Missing args");
             response.put("status", "failure");
@@ -206,18 +198,9 @@ public class CommandGatewayService extends Service {
         response.put("status", "success");
         response.put("message", "Make up clock-in successful for " + date); // Unify: add message to the outermost layer
 
-        JSONArray output = new JSONArray();
-        JSONObject dateObj = new JSONObject();
-        dateObj.put("name", "date");
-        dateObj.put("type", "string");
-        dateObj.put("value", date);
-        output.put(dateObj);
-        JSONObject boolObj = new JSONObject();
-        boolObj.put("name", "success");
-        boolObj.put("type", "boolean");
-        boolObj.put("value", "true");
-        output.put(boolObj);
-
+        JSONObject output = new JSONObject();
+        output.put("date", date);
+        output.put("success", true);
         capabilityRes.put("output", output);
         response.put("capability", capabilityRes);
         return response;

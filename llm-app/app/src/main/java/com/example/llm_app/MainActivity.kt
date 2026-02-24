@@ -340,7 +340,7 @@ class MainActivity : ComponentActivity() {
 
                 val commandJson = JSONObject().apply {
                     put("id", commandObj.getString("capability"))
-                    put("args", commandObj.getString("args"))
+                    put("input", commandObj.getString("args"))
                 }
 
                 val finalCommand = JSONObject().apply {
