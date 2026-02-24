@@ -34,6 +34,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -196,7 +197,7 @@ class MainActivity : ComponentActivity() {
         val overallStartTime = System.currentTimeMillis()
         Log.d("LatencyTest", "=== Start processing: $overallStartTime ===")
 
-        CoroutineScope(Dispatchers.IO).launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val apiKey = assets.open("openai_key.txt")
                     .bufferedReader()
@@ -483,7 +484,11 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        startService(intent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
     }
 
 

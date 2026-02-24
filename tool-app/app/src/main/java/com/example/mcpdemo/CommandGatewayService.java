@@ -1,10 +1,15 @@
 package com.example.mcpdemo;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
 import android.util.Log;
+
+import androidx.core.app.NotificationCompat;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -12,11 +17,18 @@ import org.json.JSONException;
 
 public class CommandGatewayService extends Service {
 
+    private static final String CH_ID = "mcp_gateway";
+    private static final int NOTIF_ID = 42;
+
     private ClockInManager clockInManager;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // MUST do this ASAP for startForegroundService callers
+        startForeground(NOTIF_ID, buildNotification("Processing command…"));
+
         if (intent == null) {
+            stopForeground(true);
             stopSelf(startId);
             return START_NOT_STICKY;
         }
@@ -26,6 +38,7 @@ public class CommandGatewayService extends Service {
 
         if (callback == null || requestStr == null) {
             Log.e("MCPDemo", "Missing request/callback");
+            stopForeground(true);
             stopSelf(startId);
             return START_NOT_STICKY;
         }
@@ -36,6 +49,7 @@ public class CommandGatewayService extends Service {
             requestObj = new JSONObject(requestStr);
         } catch (JSONException e) {
             Log.e("MCPDemo", "request is not json");
+            stopForeground(true);
             stopSelf(startId);
             return START_NOT_STICKY;
         }
@@ -43,6 +57,7 @@ public class CommandGatewayService extends Service {
         String requestId = requestObj.optString("id");
         if (requestId.isEmpty()) {
             Log.e("MCPDemo", "Missing request id");
+            stopForeground(true);
             stopSelf(startId);
             return START_NOT_STICKY;
         }
@@ -55,6 +70,7 @@ public class CommandGatewayService extends Service {
             JSONObject commandJson = requestObj.optJSONObject("capability");
             if (commandJson == null) {
                 Log.e("MCPDemo", "Missing capability");
+                stopForeground(true);
                 stopSelf(startId);
                 return START_NOT_STICKY;
             }
@@ -107,6 +123,7 @@ public class CommandGatewayService extends Service {
             Log.e("MCPDemo", "Callback canceled", e);
         }
         // Stop service instance
+        stopForeground(true);
         stopSelf(startId);
 
         return START_NOT_STICKY;
@@ -116,6 +133,26 @@ public class CommandGatewayService extends Service {
     public void onCreate() {
         super.onCreate();
         clockInManager = new ClockInManager(this);
+        ensureChannel();
+    }
+
+    private void ensureChannel() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            NotificationChannel ch = new NotificationChannel(
+                    CH_ID, "MCP Gateway", NotificationManager.IMPORTANCE_LOW);
+            NotificationManager nm = getSystemService(NotificationManager.class);
+            if (nm != null) nm.createNotificationChannel(ch);
+        }
+    }
+
+    private Notification buildNotification(String text) {
+        NotificationCompat.Builder b = new NotificationCompat.Builder(this, CH_ID)
+                .setSmallIcon(android.R.drawable.stat_notify_sync) // replace with your app icon
+                .setContentTitle("MCP Command")
+                .setContentText(text)
+                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW);
+        return b.build();
     }
 
     @Override
