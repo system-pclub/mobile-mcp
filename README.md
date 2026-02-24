@@ -59,14 +59,14 @@ User Natural Language Input
 ## Comparison
 
 | Approach         | Open Ecosystem | Security Control | 
-| ---------------- | ----------------- | -------------- | 
-| Qwen               | ✗                 | ✓             |
-| Apple Intelligence | ✗                 | ✓             | 
-| AppAgent           | ✓                 | ✗             |
-| droidrun           | ✓                 | ✗             |
-| Mobile-Agent       | ✓                 | ✗             |
-| AutoDroid          | ✓                 | ✗             |
-| **Mobile-MCP**     | **✓**             | **✓**          | 
+|:---------------- |:-----------------:|:--------------:| 
+| Qwen               | ❌                | ✅             |
+| Apple Intelligence | ❌                 | ✅             | 
+| AppAgent           | ✅                 | ❌            |
+| droidrun           | ✅                | ❌             |
+| Mobile-Agent       | ✅                | ❌             |
+| AutoDroid          | ✅                | ❌             |
+| **Mobile-MCP**     | ✅             | ✅         | 
 
 ## Performance Evaluation
 
