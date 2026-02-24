@@ -194,6 +194,7 @@ The result is encoded in the following schema.
   - value: the value for the return
 - status: “success” or “failure”
 - message: optional; natural-language description for the failure reason or the successful event.
+
 One possible way to return the result is to create an Intent, attach the JSON response string as an extra, and deliver it by invoking the send(Context, int, Intent) method of the PendingIntent. This implementation detail is not part of the protocol specification. 
 
 #### 3.3 Result Interpretation 
