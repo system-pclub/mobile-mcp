@@ -22,6 +22,7 @@ mobile-mcp/
 │       │   └── McpResultReceiver.kt        # Receives service callback broadcast and dispatches to McpResultBus
 │       └── res/                            # UI/resources
 ├── spec/                                   # protocol specifications
+├── paper/                                  # Research paper
 ├── tool-app/                               # Tool provider app
 │   └── app/src/main/
 │       ├── AndroidManifest.xml             # App registry: exported MCP service, capability metadata link
