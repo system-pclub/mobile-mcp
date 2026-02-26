@@ -118,3 +118,7 @@ cat results/benchmark_summary_granular.txt
 ## Video Link
 
 - [Project Demo Video](https://youtu.be/Bc2LG3sR1NY)
+
+## Paper Link
+
+- [mobile_mcp](https://github.com/system-pclub/mobile-mcp/blob/main/paper/mobile_mcp.pdf)
